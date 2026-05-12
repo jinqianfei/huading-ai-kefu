@@ -1,0 +1,204 @@
+{
+  "output_type": "contract_rules_review",
+  "version": "2.0.0",
+  "layout": "two_column",
+  "sections": [
+    {
+      "section_id": "contract_info",
+      "title": "合同基本信息",
+      "layout": "vertical_form",
+      "collapsible": false,
+      "fields": [
+        { "field_id": "contract_no", "render_as": "readonly_text", "show_confidence": true },
+        { "field_id": "customer_name", "render_as": "readonly_text" },
+        { "field_id": "effective_date", "render_as": "editable_date", "highlight_on_status": ["LOW_CONFIDENCE"], "show_confidence": true, "show_source_location": true },
+        { "field_id": "expiry_date", "render_as": "editable_date", "highlight_on_status": ["LOW_CONFIDENCE"], "show_confidence": true },
+        { "field_id": "settlement_staff", "render_as": "editable_text", "highlight_on_status": ["LOW_CONFIDENCE"], "show_confidence": true }
+      ],
+      "confidence_visual": {
+        "high": { "color": "#52c41a", "icon": "check-circle" },
+        "medium": { "color": "#faad14", "icon": "exclamation-circle" },
+        "low": { "color": "#f5222d", "icon": "close-circle" }
+      }
+    },
+    {
+      "section_id": "storage_rules",
+      "title": "仓储费规则",
+      "layout": "vertical_form",
+      "collapsible": false,
+      "title_suffix": "（存储费、操作费）",
+      "fields": [
+        { "field_id": "storage_pricing", "render_as": "editable_table", "highlight_on_status": ["LOW_CONFIDENCE"], "show_confidence": true, "show_source_location": true, "required": true },
+        { "field_id": "operation_fee_whole", "render_as": "editable_number", "highlight_on_status": ["LOW_CONFIDENCE"], "show_confidence": true, "suffix": "元/标准件" },
+        { "field_id": "operation_fee_split", "render_as": "editable_number", "highlight_on_status": ["LOW_CONFIDENCE"], "show_confidence": true, "suffix": "元/最小单位" },
+        { "field_id": "inbound_fee", "render_as": "editable_number", "highlight_on_status": ["LOW_CONFIDENCE", "NOT_FOUND"], "show_confidence": true, "suffix": "元/托" }
+      ]
+    },
+    {
+      "section_id": "transfer_rules",
+      "title": "调拨报价",
+      "layout": "vertical_form",
+      "collapsible": false,
+      "description": "仓库间调拨费用（非门店配送）",
+      "warning_banner": {
+        "enabled": true,
+        "message": "⚠️ 调拨 = 仓库到仓库，如合同未区分请在validation中标记",
+        "color": "#faad14"
+      },
+      "fields": [
+        { "field_id": "transfer_min_order_qty", "render_as": "editable_number", "highlight_on_status": ["LOW_CONFIDENCE"], "show_confidence": true, "suffix": "件" },
+        { "field_id": "transfer_routes", "render_as": "editable_matrix", "highlight_on_status": ["LOW_CONFIDENCE", "NOT_FOUND"], "show_confidence": true, "show_source_location": true },
+        { "field_id": "transfer_price_type", "render_as": "editable_select", "highlight_on_status": ["LOW_CONFIDENCE"], "show_confidence": true, "options": ["统一单价", "分路线计价"] },
+        { "field_id": "transfer_unit", "render_as": "readonly_text", "value": "元/标准件" }
+      ]
+    },
+    {
+      "section_id": "delivery_rules",
+      "title": "共配报价",
+      "layout": "vertical_form",
+      "collapsible": false,
+      "description": "仓库到门店配送费用",
+      "warning_banner": {
+        "enabled": true,
+        "message": "⚠️ 共配 = 仓库到门店，与调拨（仓库到仓库）必须分开",
+        "color": "#1890ff"
+      },
+      "fields": [
+        { "field_id": "delivery_pricing_type", "render_as": "editable_select", "highlight_on_status": ["LOW_CONFIDENCE"], "show_confidence": true, "options": ["不分区间", "分区间", "数量区间", "专车", "冷链"] },
+        { "field_id": "delivery_standard_unit_rule", "render_as": "editable_text", "highlight_on_status": ["LOW_CONFIDENCE"], "show_confidence": true },
+        { "field_id": "delivery_min_order_qty", "render_as": "editable_number", "highlight_on_status": ["LOW_CONFIDENCE"], "show_confidence": true, "suffix": "件" },
+        { "field_id": "delivery_routes", "render_as": "editable_matrix", "highlight_on_status": ["LOW_CONFIDENCE", "NOT_FOUND"], "show_confidence": true, "show_source_location": true },
+        { "field_id": "delivery_min_fee", "render_as": "editable_text", "highlight_on_status": ["LOW_CONFIDENCE"], "show_confidence": true, "show_source_location": true }
+      ]
+    },
+    {
+      "section_id": "standard_unit_rules",
+      "title": "标准件计算规则",
+      "layout": "vertical_form",
+      "collapsible": false,
+      "fields": [
+        { "field_id": "max_weight_kg", "render_as": "editable_number", "show_confidence": true, "suffix": "kg", "default_value": 15 },
+        { "field_id": "max_volume_m3", "render_as": "editable_number", "show_confidence": true, "suffix": "m³", "default_value": 0.05 },
+        { "field_id": "oversized_tier1", "render_as": "editable_number", "show_confidence": true, "suffix": "倍", "default_value": 1.2, "highlight_on_status": ["LOW_CONFIDENCE"] },
+        { "field_id": "oversized_tier2", "render_as": "editable_number", "show_confidence": true, "suffix": "倍", "default_value": 2.0, "highlight_on_status": ["LOW_CONFIDENCE"] }
+      ]
+    },
+    {
+      "section_id": "product_coefficients",
+      "title": "产品固定系数",
+      "layout": "vertical_form",
+      "collapsible": true,
+      "defaultCollapsed": true,
+      "description": "特定SKU的计费系数，优先于标准件规则计算",
+      "fields": [
+        { "field_id": "products", "render_as": "editable_table", "highlight_on_status": ["LOW_CONFIDENCE", "NOT_FOUND"], "show_confidence": true, "show_source_location": true },
+        { "field_id": "coefficient_unit", "render_as": "readonly_text", "value": "倍" }
+      ]
+    },
+    {
+      "section_id": "value_added_rules",
+      "title": "增值服务费",
+      "layout": "vertical_form",
+      "collapsible": true,
+      "defaultCollapsed": true,
+      "fields": [
+        { "field_id": "mixed_sorting_fee", "render_as": "editable_number", "highlight_on_status": ["LOW_CONFIDENCE", "NOT_FOUND"], "show_confidence": true, "suffix": "元/件" },
+        { "field_id": "repackaging_fee", "render_as": "editable_number", "highlight_on_status": ["LOW_CONFIDENCE", "NOT_FOUND"], "show_confidence": true, "suffix": "元/件" },
+        { "field_id": "labeling_fee", "render_as": "editable_number", "highlight_on_status": ["LOW_CONFIDENCE", "NOT_FOUND"], "show_confidence": true, "suffix": "元/件" },
+        { "field_id": "delivery_to_store_fee", "render_as": "editable_number", "highlight_on_status": ["LOW_CONFIDENCE", "NOT_FOUND"], "show_confidence": true, "suffix": "元/标准件" }
+      ]
+    },
+    {
+      "section_id": "special_rules",
+      "title": "特殊条款",
+      "layout": "vertical_form",
+      "collapsible": true,
+      "defaultCollapsed": true,
+      "fields": [
+        { "field_id": "difficult_delivery_surcharge", "render_as": "editable_number", "highlight_on_status": ["LOW_CONFIDENCE", "NOT_FOUND"], "show_confidence": true, "suffix": "%" },
+        { "field_id": "difficult_delivery_keywords", "render_as": "editable_text", "highlight_on_status": ["LOW_CONFIDENCE", "NOT_FOUND"], "show_confidence": true, "placeholder": "如：超市、商场、购物中心" }
+      ]
+    },
+    {
+      "section_id": "rebate_discount_rules",
+      "title": "返利/折扣条款",
+      "layout": "vertical_form",
+      "collapsible": true,
+      "defaultCollapsed": true,
+      "warning_banner": {
+        "enabled": true,
+        "message": "⚠️ 返利折扣需人工确认后方可生效",
+        "color": "#faad14"
+      },
+      "fields": [
+        { "field_id": "rebate_type", "render_as": "editable_select", "highlight_on_status": ["LOW_CONFIDENCE", "NOT_FOUND"], "options": ["月发货量阶梯", "固定折扣比例", "无"], "show_confidence": true },
+        { "field_id": "rebate_conditions", "render_as": "editable_text", "highlight_on_status": ["LOW_CONFIDENCE", "NOT_FOUND"], "show_confidence": true },
+        { "field_id": "rebate_discount_value", "render_as": "editable_number", "highlight_on_status": ["LOW_CONFIDENCE", "NOT_FOUND"], "show_confidence": true, "suffix": "%或元" },
+        { "field_id": "rebate_effective_date", "render_as": "editable_date", "highlight_on_status": ["LOW_CONFIDENCE", "NOT_FOUND"], "show_confidence": true },
+        { "field_id": "rebate_expiry_date", "render_as": "editable_date", "highlight_on_status": ["LOW_CONFIDENCE", "NOT_FOUND"], "show_confidence": true }
+      ]
+    },
+    {
+      "section_id": "validation",
+      "title": "交叉验证结果",
+      "layout": "card",
+      "collapsible": false,
+      "fields": [
+        { "field_id": "formula_check", "render_as": "alert_message", "alert_types": { "CONFIRMED": "success", "LOW_CONFIDENCE": "warning" } },
+        { "field_id": "consistency_check", "render_as": "alert_message", "alert_types": { "CONFIRMED": "success", "LOW_CONFIDENCE": "warning" } },
+        { "field_id": "anomaly_check", "render_as": "alert_message", "alert_types": { "CONFIRMED": "success", "LOW_CONFIDENCE": "warning" } },
+        { "field_id": "transfer_delivery_distinction", "render_as": "alert_message", "alert_types": { "CONFIRMED": "success", "LOW_CONFIDENCE": "warning", "NOT_FOUND": "error" } }
+      ]
+    },
+    {
+      "section_id": "summary",
+      "title": "汇总信息",
+      "layout": "card",
+      "collapsible": false,
+      "fields": [
+        { "field_id": "total_rules", "render_as": "statistic", "label": "提取规则数" },
+        { "field_id": "high_confidence", "render_as": "statistic", "label": "高置信度", "color": "#52c41a" },
+        { "field_id": "medium_confidence", "render_as": "statistic", "label": "中置信度", "color": "#faad14" },
+        { "field_id": "low_confidence", "render_as": "statistic", "label": "低置信度", "color": "#f5222d" },
+        { "field_id": "critical_issues", "render_as": "statistic", "label": "严重问题", "color": "#f5222d" },
+        { "field_id": "needs_review", "render_as": "confidence_badge", "label": "需确认" }
+      ]
+    }
+  ],
+  "system_actions_bar": {
+    "position": "bottom_fixed",
+    "background": "#ffffff",
+    "shadow": "0 -2px 8px rgba(0,0,0,0.1)",
+    "padding": "16px 24px",
+    "actions": [
+      { "action_id": "save_to_library", "render_as": "primary_button", "label": "保存规则库", "icon": "save", "enabled_when": "critical_issues = 0" },
+      { "action_id": "save_with_override", "render_as": "secondary_button", "label": "强制保存", "icon": "warning", "danger": true, "enabled_when": "critical_issues > 0" },
+      { "action_id": "reject_all", "render_as": "text_button", "label": "全部重填", "danger": true, "icon": "refresh" }
+    ]
+  },
+  "render_components": {
+    "editable_table": {
+      "columns": ["仓库", "温区", "单价", "单位", "置信度", "来源"],
+      "editable_columns": ["单价"],
+      "sortable": true,
+      "filterable": true
+    },
+    "editable_matrix": {
+      "row_header": "始发仓",
+      "col_header": "目的仓/区域",
+      "value_label": "单价",
+      "editable": true,
+      "show_min_fee": true
+    },
+    "confidence_badge": {
+      "high": { "color": "#52c41a", "label": "✓ 可入库" },
+      "medium": { "color": "#faad14", "label": "⚠ 建议确认" },
+      "low": { "color": "#f5222d", "label": "✗ 需人工" }
+    },
+    "alert_message": {
+      "success": { "icon": "check-circle", "color": "#52c41a" },
+      "warning": { "icon": "exclamation-circle", "color": "#faad14" },
+      "error": { "icon": "close-circle", "color": "#f5222d" }
+    }
+  }
+}

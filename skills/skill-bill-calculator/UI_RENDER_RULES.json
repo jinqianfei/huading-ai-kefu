@@ -1,0 +1,67 @@
+{
+  "output_type": "bill_calculation",
+  "layout": "two_column",
+  "sections": [
+    {
+      "section_id": "bill_header",
+      "layout": "card",
+      "collapsible": false,
+      "fields": [
+        { "field_id": "customer_name", "render_as": "readonly_text" },
+        { "field_id": "billing_period", "render_as": "readonly_text" },
+        { "field_id": "outbound_records_count", "render_as": "readonly_text" }
+      ]
+    },
+    {
+      "section_id": "fee_breakdown",
+      "layout": "table",
+      "collapsible": false,
+      "columns": [
+        { "col_id": "fee_type", "label": "费用类型", "width": "120px" },
+        { "col_id": "calculation_rule", "label": "计算规则", "width": "200px" },
+        { "col_id": "quantity", "label": "数量", "width": "100px", "align": "right" },
+        { "col_id": "unit_price", "label": "单价", "width": "100px", "align": "right" },
+        { "col_id": "amount", "label": "金额", "width": "120px", "align": "right" },
+        { "col_id": "source", "label": "来源", "width": "120px" }
+      ],
+      "striped": true,
+      "hoverable": true,
+      "summary": true
+    },
+    {
+      "section_id": "bill_summary",
+      "layout": "card",
+      "collapsible": false,
+      "fields": [
+        { "field_id": "storage_fee", "render_as": "readonly_text" },
+        { "field_id": "transport_fee", "render_as": "readonly_text" },
+        { "field_id": "outbound_fee", "render_as": "readonly_text" },
+        { "field_id": "other_fee", "render_as": "readonly_text" },
+        { "field_id": "total_amount", "render_as": "readonly_text", "class": "total-amount" }
+      ],
+      "summary_style": true
+    },
+    {
+      "section_id": "audit_info",
+      "layout": "card",
+      "collapsible": true,
+      "defaultCollapsed": true,
+      "fields": [
+        { "field_id": "ai_confidence", "render_as": "confidence_badge" },
+        { "field_id": "rule_match_status", "render_as": "readonly_text" }
+      ]
+    }
+  ],
+  "system_actions_bar": {
+    "position": "bottom_fixed",
+    "background": "#ffffff",
+    "shadow": "0 -2px 8px rgba(0,0,0,0.1)",
+    "padding": "16px 24px",
+    "actions": [
+      { "action_id": "confirm_bill", "render_as": "primary_button", "label": "确认账单", "icon": "check" },
+      { "action_id": "override_bill", "render_as": "secondary_button", "label": "人工修正", "icon": "edit" },
+      { "action_id": "submit_bill", "render_as": "primary_button", "label": "提交BMS", "icon": "upload" },
+      { "action_id": "reject_bill", "render_as": "text_button", "label": "驳回重算", "danger": true, "icon": "close" }
+    ]
+  }
+}

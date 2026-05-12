@@ -1,0 +1,115 @@
+{
+  "handlers": [
+    {
+      "action_id": "approve_bill",
+      "trigger": "button_click",
+      "request": {
+        "action": "APPROVE_BILL",
+        "payload": {
+          "task_id": "{{task_id}}",
+          "bill_no": "{{bill_no}}",
+          "auditor": "{{current_user}}"
+        }
+      },
+      "response_handling": {
+        "success": {
+          "render_type": "show_message",
+          "message": "账单审核已通过",
+          "message_type": "success"
+        },
+        "render_type_2": "update_field",
+        "update_fields": { "final_status": "APPROVED" }
+      },
+      "confirm": {
+        "required": true,
+        "title": "确认通过",
+        "message": "确定要通过此账单审核吗？"
+      }
+    },
+    {
+      "action_id": "reject_bill",
+      "trigger": "button_click",
+      "request": {
+        "action": "REJECT_BILL",
+        "payload": {
+          "task_id": "{{task_id}}",
+          "bill_no": "{{bill_no}}",
+          "reason": "{{user_reason}}"
+        }
+      },
+      "response_handling": {
+        "success": {
+          "render_type": "show_message",
+          "message": "账单已驳回，请检查异常项后重新提交",
+          "message_type": "warning"
+        }
+      },
+      "confirm": {
+        "required": true,
+        "title": "确认驳回",
+        "message": "确定要驳回此账单吗？请填写驳回原因。"
+      }
+    },
+    {
+      "action_id": "export_report",
+      "trigger": "button_click",
+      "request": {
+        "action": "EXPORT_AUDIT_REPORT",
+        "payload": {
+          "task_id": "{{task_id}}",
+          "bill_no": "{{bill_no}}"
+        }
+      },
+      "response_handling": {
+        "success": {
+          "render_type": "download_file",
+          "file_field": "report_file"
+        }
+      },
+      "loading": {
+        "show": true,
+        "text": "正在生成审核报告..."
+      }
+    },
+    {
+      "action_id": "view_detail",
+      "trigger": "row_button_click",
+      "request": {
+        "action": "SHOW_ANOMALY_DETAIL",
+        "payload": {
+          "task_id": "{{task_id}}",
+          "anomaly_id": "{{row.anomaly_id}}"
+        }
+      },
+      "response_handling": {
+        "success": {
+          "render_type": "show_dialog",
+          "dialog_type": "anomaly_detail"
+        }
+      }
+    },
+    {
+      "action_id": "ignore",
+      "trigger": "row_button_click",
+      "request": {
+        "action": "IGNORE_ANOMALY",
+        "payload": {
+          "task_id": "{{task_id}}",
+          "anomaly_id": "{{row.anomaly_id}}",
+          "reason": "{{user_reason}}"
+        }
+      },
+      "response_handling": {
+        "success": {
+          "render_type": "update_row",
+          "update_fields": { "status": "IGNORED" }
+        }
+      },
+      "confirm": {
+        "required": true,
+        "title": "确认忽略",
+        "message": "确定要忽略此异常项吗？"
+      }
+    }
+  ]
+}

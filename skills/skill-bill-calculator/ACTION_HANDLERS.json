@@ -1,0 +1,99 @@
+{
+  "handlers": [
+    {
+      "action_id": "confirm_bill",
+      "trigger": "button_click",
+      "request": {
+        "action": "CONFIRM_BILL",
+        "payload": {
+          "task_id": "{{task_id}}",
+          "customer_id": "{{customer_id}}",
+          "billing_period": "{{billing_period}}",
+          "total_amount": "{{total_amount}}"
+        }
+      },
+      "response_handling": {
+        "success": {
+          "render_type": "update_field",
+          "update_fields": { "status": "CONFIRMED" },
+          "render_type_2": "show_message",
+          "message": "账单已确认",
+          "message_type": "success"
+        }
+      },
+      "loading": {
+        "show": true,
+        "text": "正在确认账单..."
+      }
+    },
+    {
+      "action_id": "override_bill",
+      "trigger": "button_click",
+      "request": {
+        "action": "SHOW_OVERRIDE_FORM",
+        "payload": {
+          "task_id": "{{task_id}}"
+        }
+      },
+      "response_handling": {
+        "success": {
+          "render_type": "show_dialog",
+          "dialog_type": "override_form"
+        }
+      }
+    },
+    {
+      "action_id": "submit_bill",
+      "trigger": "button_click",
+      "request": {
+        "action": "SUBMIT_TO_BMS",
+        "payload": {
+          "task_id": "{{task_id}}",
+          "customer_id": "{{customer_id}}",
+          "billing_period": "{{billing_period}}",
+          "bill_summary": "{{all_confirmed_fields}}"
+        }
+      },
+      "response_handling": {
+        "success": {
+          "render_type": "show_message",
+          "message": "账单已提交至BMS系统",
+          "message_type": "success"
+        }
+      },
+      "loading": {
+        "show": true,
+        "text": "正在提交账单..."
+      },
+      "confirm": {
+        "required": true,
+        "title": "确认提交",
+        "message": "确定要将账单提交至BMS系统吗？提交后将无法撤回。",
+        "okText": "确认提交",
+        "cancelText": "取消"
+      }
+    },
+    {
+      "action_id": "reject_bill",
+      "trigger": "button_click",
+      "request": {
+        "action": "REJECT_BILL",
+        "payload": {
+          "task_id": "{{task_id}}",
+          "reason": "{{user_reason}}"
+        }
+      },
+      "response_handling": {
+        "success": {
+          "render_type": "reset_form",
+          "message": "账单已驳回，请检查数据后重新计算"
+        }
+      },
+      "confirm": {
+        "required": true,
+        "title": "确认驳回",
+        "message": "确定要驳回此账单吗？"
+      }
+    }
+  ]
+}

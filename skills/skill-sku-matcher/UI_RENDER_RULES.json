@@ -1,0 +1,53 @@
+{
+  "output_type": "sku_match_result",
+  "layout": "single_column",
+  "sections": [
+    {
+      "section_id": "match_result",
+      "layout": "card",
+      "collapsible": false,
+      "fields": [
+        { "field_id": "match_type", "render_as": "readonly_text", "show_confidence": false },
+        { "field_id": "system_sku_code", "render_as": "editable_text", "highlight_on_status": ["LOW_CONFIDENCE", "NOT_FOUND"], "show_confidence": true },
+        { "field_id": "system_sku_name", "render_as": "editable_text", "highlight_on_status": ["LOW_CONFIDENCE", "NOT_FOUND"], "show_confidence": true },
+        { "field_id": "unit_conversion", "render_as": "readonly_text", "show_confidence": true },
+        { "field_id": "fee_coefficient", "render_as": "readonly_text", "show_confidence": true },
+        { "field_id": "confidence", "render_as": "confidence_badge", "show_confidence": false }
+      ],
+      "confidence_visual": {
+        "high": { "color": "#52c41a", "icon": "check-circle", "label": "高可信" },
+        "medium": { "color": "#faad14", "icon": "exclamation-circle", "label": "需确认" },
+        "low": { "color": "#f5222d", "icon": "close-circle", "label": "无法匹配" }
+      }
+    },
+    {
+      "section_id": "alternatives",
+      "layout": "table",
+      "collapsible": true,
+      "defaultCollapsed": true,
+      "title_suffix": "（语义匹配备选）",
+      "columns": [
+        { "col_id": "system_sku_code", "label": "系统SKU编码", "width": "140px" },
+        { "col_id": "system_sku_name", "label": "系统商品名", "width": "200px" },
+        { "col_id": "similarity", "label": "相似度", "width": "100px", "align": "right", "render_as": "percentage" },
+        { "col_id": "action", "label": "操作", "width": "80px" }
+      ],
+      "row_actions": [
+        { "action_id": "select_alternative", "label": "选择", "icon": "check", "type": "primary" }
+      ],
+      "striped": true,
+      "hoverable": true,
+      "empty_state": "无备选方案"
+    }
+  ],
+  "system_actions_bar": {
+    "position": "bottom_fixed",
+    "background": "#ffffff",
+    "shadow": "0 -2px 8px rgba(0,0,0,0.1)",
+    "padding": "16px 24px",
+    "actions": [
+      { "action_id": "confirm_match", "render_as": "primary_button", "label": "确认匹配", "icon": "check" },
+      { "action_id": "manual_select", "render_as": "secondary_button", "label": "手动选择", "icon": "edit" }
+    ]
+  }
+}

@@ -1,0 +1,174 @@
+{
+  "output_type": "order_recognition_result",
+  "version": "1.1.0",
+  "layout": "two_column",
+  "sections": [
+    {
+      "section_id": "file_info",
+      "layout": "card",
+      "collapsible": false,
+      "fields": [
+        { "field_id": "file_type", "render_as": "readonly_text", "show_confidence": false },
+        { "field_id": "file_name", "render_as": "readonly_text", "show_confidence": false },
+        { "field_id": "file_size", "render_as": "readonly_text", "show_confidence": false },
+        { "field_id": "sheet_count", "render_as": "readonly_text", "show_confidence": false }
+      ]
+    },
+    {
+      "section_id": "template_info",
+      "layout": "vertical_form",
+      "collapsible": false,
+      "fields": [
+        {
+          "field_id": "template_type",
+          "render_as": "editable_text",
+          "highlight_on_status": ["LOW_CONFIDENCE", "NEED_INPUT"],
+          "show_confidence": true
+        },
+        {
+          "field_id": "customer_match",
+          "render_as": "editable_text",
+          "highlight_on_status": ["LOW_CONFIDENCE", "NOT_FOUND"],
+          "show_confidence": true
+        },
+        {
+          "field_id": "customer_full_name",
+          "render_as": "editable_text",
+          "highlight_on_status": ["LOW_CONFIDENCE", "NOT_FOUND"],
+          "show_confidence": true
+        }
+      ],
+      "confidence_visual": {
+        "high": { "color": "#52c41a", "icon": "check-circle" },
+        "medium": { "color": "#faad14", "icon": "exclamation-circle" },
+        "low": { "color": "#f5222d", "icon": "close-circle" }
+      }
+    },
+    {
+      "section_id": "order_items",
+      "layout": "table",
+      "collapsible": false,
+      "columns": [
+        { "col_id": "row_index", "label": "序号", "width": "50px", "align": "center" },
+        { "col_id": "sku_code", "label": "商品编码", "width": "120px", "show_confidence": true },
+        { "col_id": "sku_name", "label": "商品名称", "width": "180px", "show_confidence": true },
+        { "col_id": "spec", "label": "规格", "width": "120px", "show_confidence": true },
+        { "col_id": "quantity", "label": "数量", "width": "60px", "align": "right", "show_confidence": true },
+        { "col_id": "unit", "label": "单位", "width": "60px", "align": "center", "show_confidence": true },
+        { "col_id": "confidence", "label": "置信度", "width": "80px", "align": "center", "render_as": "confidence_badge" },
+        { "col_id": "status", "label": "状态", "width": "80px", "align": "center", "render_as": "status_badge" },
+        { "col_id": "actions", "label": "操作", "width": "100px", "render_as": "button_group" }
+      ],
+      "row_actions": [
+        { "action_id": "confirm_item", "label": "确认", "icon": "check" },
+        { "action_id": "edit_item", "label": "修改", "icon": "edit" }
+      ],
+      "row_highlight": {
+        "CONFIRMED": { "backgroundColor": "#f6ffed", "borderLeft": "3px solid #52c41a" },
+        "LOW_CONFIDENCE": { "backgroundColor": "#fffbe6", "borderLeft": "3px solid #faad14" },
+        "NEED_INPUT": { "backgroundColor": "#fff1f0", "borderLeft": "3px solid #f5222d" },
+        "NOT_FOUND": { "backgroundColor": "#fff1f0", "borderLeft": "3px solid #f5222d" }
+      },
+      "confidence_visual": {
+        "high": { "color": "#52c41a", "icon": "check-circle", "threshold": 0.95 },
+        "medium": { "color": "#faad14", "icon": "exclamation-circle", "threshold": 0.80 },
+        "low": { "color": "#f5222d", "icon": "close-circle", "threshold": 0.0 }
+      },
+      "status_badge": {
+        "CONFIRMED": { "text": "已确认", "color": "#52c41a", "background": "#f6ffed" },
+        "LOW_CONFIDENCE": { "text": "待确认", "color": "#faad14", "background": "#fffbe6" },
+        "NEED_INPUT": { "text": "需填写", "color": "#f5222d", "background": "#fff1f0" },
+        "NOT_FOUND": { "text": "未匹配", "color": "#f5222d", "background": "#fff1f0" }
+      },
+      "empty_state": "暂无商品明细"
+    },
+    {
+      "section_id": "order_summary",
+      "layout": "horizontal_form",
+      "collapsible": false,
+      "fields": [
+        { "field_id": "total_items", "render_as": "readonly_text", "show_confidence": false },
+        { "field_id": "total_quantity", "render_as": "readonly_text", "show_confidence": false },
+        { "field_id": "notes", "render_as": "editable_text", "show_confidence": true }
+      ]
+    },
+    {
+      "section_id": "pending_mappings",
+      "title": "待确认映射",
+      "layout": "pending_list",
+      "collapsible": true,
+      "collapsed_by_default": false,
+      "show_when": "has_pending_tasks",
+      "fields": [],
+      "pending_item_render": {
+        "field_id": "pending_task_id",
+        "render_as": "pending_card",
+        "show_candidates": true,
+        "candidate_selection": "single_choice",
+        "actions": ["confirm_mapping", "reject_mapping", "manual_input"]
+      },
+      "pending_status_badge": {
+        "PENDING": { "text": "待确认", "color": "#faad14", "background": "#fffbe6" },
+        "CONFIRMED": { "text": "已确认", "color": "#52c41a", "background": "#f6ffed" },
+        "REJECTED": { "text": "已拒绝", "color": "#f5222d", "background": "#fff1f0" },
+        "EXPIRED": { "text": "已过期", "color": "#8c8c8c", "background": "#f5f5f5" }
+      },
+      "field_type_labels": {
+        "STORE": "门店",
+        "SKU": "商品",
+        "UNIT_TYPE": "单位类型",
+        "DELIVERY_METHOD": "配送方式",
+        "BUSINESS_TYPE": "业务类型",
+        "WAREHOUSE": "仓库"
+      },
+      "empty_state": "暂无待确认的字段映射"
+    },
+    {
+      "section_id": "unmapped_fields",
+      "title": "未映射字段",
+      "layout": "unmapped_list",
+      "collapsible": true,
+      "collapsed_by_default": true,
+      "show_when": "has_unmapped_fields",
+      "fields": [],
+      "unmapped_item_render": {
+        "field_id": "unmapped_field",
+        "render_as": "unmapped_card",
+        "show_candidates": true,
+        "show_reason": true,
+        "actions": ["create_mapping_task", "ignore_field"]
+      },
+      "empty_state": "所有字段已成功映射"
+    }
+  ],
+  "pending_field_highlight": {
+    "enabled": true,
+    "styles": {
+      "border": "2px dashed #faad14",
+      "background": "#fffbe6",
+      "icon": "clock-circle",
+      "tooltip": "该字段需要确认映射关系"
+    }
+  },
+  "system_actions_bar": {
+    "position": "bottom_fixed",
+    "background": "#ffffff",
+    "shadow": "0 -2px 8px rgba(0,0,0,0.1)",
+    "padding": "16px 24px",
+    "actions": [
+      {
+        "action_id": "confirm_and_continue",
+        "render_as": "primary_button",
+        "label": "确认并继续",
+        "icon": "arrow-right",
+        "enabled_when": "all_confidence >= 0.80"
+      },
+      {
+        "action_id": "cancel",
+        "render_as": "secondary_button",
+        "label": "取消",
+        "icon": "close"
+      }
+    ]
+  }
+}

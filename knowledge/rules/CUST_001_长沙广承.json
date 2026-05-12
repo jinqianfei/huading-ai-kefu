@@ -1,0 +1,95 @@
+{
+  "customer_id": "CUST_001",
+  "customer_name": "长沙广承供应链有限公司",
+  "contract_no": "HDLL-CP-2025-286",
+  "contract_date": "",
+  "effective_date": "2025-01-01",
+  "valid_to": "2025-12-31",
+  "结算专员": "",
+  "confirmed": false,
+  "confirmed_at": null,
+  "tax_rates": {
+    "仓储": 0.06,
+    "运输": 0.09
+  },
+
+  "billing_mode": {
+    "mode": "pallet",
+    "description": "托盘计费",
+    "billing_unit": "托盘"
+  },
+
+  "rules": {
+    "storage": {
+      "description": "仓储费规则（托盘模式）",
+      "billing_unit": "托盘",
+      "operation_mode": "separate",
+      "operation_fee": 1.5,
+      "operation_unit": "元/标准件",
+      "overdue_enabled": false,
+      "pricing": {
+        "成都仓": {
+          "保鲜": { "price": 3.2, "unit": "元/托/天" },
+          "冷冻": { "price": 3.2, "unit": "元/托/天" },
+          "常温": { "price": 1.0, "unit": "元/托/天" }
+        }
+      }
+    },
+
+    "transfer": {
+      "description": "调拨报价（仓库间调拨）- 暂无数据"
+    },
+
+    "delivery": {
+      "description": "共配报价（仓库到门店）",
+      "pricing_type": "不分区间",
+      "standard_unit_rule": "单件≤15kg且≤0.05m³为1标准件",
+      "min_order_qty": 1,
+      "min_order_qty_billing_mode": "按实际数量计费",
+      "min_fee": null,
+      "unit": "元/标准件",
+      "included_in_storage": false,
+      "routes": {}
+    },
+
+    "oversized": {
+      "description": "超规格计费规则"
+    },
+
+    "standard_unit": {
+      "max_weight_kg": 15,
+      "max_volume_m3": 0.05,
+      "calculation_rule": "max(重量/max_weight, 体积/max_volume)，向上取整"
+    },
+
+    "product_coefficients": {
+      "description": "产品固定系数（优先于标准件规则）",
+      "coefficient_unit": "倍",
+      "products": {}
+    },
+
+    "value_added": {
+      "送货进店费": { "price": 1.0, "unit": "元/标准件" }
+    },
+
+    "special": {
+      "其他": []
+    },
+
+    "rebate_discount": {
+      "type": "无",
+      "conditions": null,
+      "ratio": null
+    }
+  },
+
+  "notes": [
+    "计费模式：托盘计费",
+    "操作费（统配出库费）：1.5元/标准件",
+    "标准件计算：max(重量/15, 体积/0.05)，向上取整",
+    "送货进店费：1元/标准件"
+  ],
+
+  "version": "2.2.0",
+  "updated_at": "2026-05-09"
+}

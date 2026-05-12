@@ -1,0 +1,64 @@
+{
+  "skill_id": "skill-bill-calculator",
+  "version": "1.0.0",
+  "output_type": "bill_calculation",
+  "description": "账单计算结果输出结构，包含费用明细和汇总",
+  "fields": [
+    {
+      "section_id": "bill_header",
+      "title": "账单头信息",
+      "confidence_threshold": 0.9,
+      "fields": [
+        { "field_id": "customer_name", "label": "客户名称" },
+        { "field_id": "billing_period", "label": "账期" },
+        { "field_id": "outbound_records_count", "label": "出库记录数" }
+      ]
+    },
+    {
+      "section_id": "fee_breakdown",
+      "title": "费用明细",
+      "confidence_threshold": 0.95,
+      "row_based": true,
+      "columns": [
+        { "col_id": "fee_type", "label": "费用类型", "width": "120px" },
+        { "col_id": "calculation_rule", "label": "计算规则", "width": "200px" },
+        { "col_id": "quantity", "label": "数量", "width": "100px", "align": "right" },
+        { "col_id": "unit_price", "label": "单价", "width": "100px", "align": "right" },
+        { "col_id": "amount", "label": "金额", "width": "120px", "align": "right" },
+        { "col_id": "source", "label": "来源", "width": "120px" }
+      ],
+      "summary": true
+    },
+    {
+      "section_id": "bill_summary",
+      "title": "账单汇总",
+      "confidence_threshold": 0.99,
+      "fields": [
+        { "field_id": "storage_fee", "label": "仓储费" },
+        { "field_id": "transport_fee", "label": "运输费" },
+        { "field_id": "outbound_fee", "label": "出库费" },
+        { "field_id": "other_fee", "label": "其他费用" },
+        { "field_id": "total_amount", "label": "账单总额" }
+      ]
+    },
+    {
+      "section_id": "audit_info",
+      "title": "审核信息",
+      "fields": [
+        { "field_id": "ai_confidence", "label": "AI置信度" },
+        { "field_id": "rule_match_status", "label": "规则匹配状态" }
+      ]
+    }
+  ],
+  "system_actions": [
+    { "action_id": "confirm_bill", "label": "确认账单", "type": "primary", "icon": "check" },
+    { "action_id": "override_bill", "label": "人工修正", "type": "warning", "icon": "edit" },
+    { "action_id": "submit_bill", "label": "提交BMS", "type": "primary", "icon": "upload", "enabled_when": "status = confirmed" },
+    { "action_id": "reject_bill", "label": "驳回重算", "type": "danger", "icon": "close" }
+  ],
+  "metadata": {
+    "task_id": "string",
+    "calculation_time_ms": "number",
+    "rules_applied": "number"
+  }
+}

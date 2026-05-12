@@ -1,0 +1,78 @@
+{
+  "output_type": "bill_audit_result",
+  "layout": "two_column",
+  "sections": [
+    {
+      "section_id": "audit_summary",
+      "layout": "card",
+      "collapsible": false,
+      "fields": [
+        { "field_id": "audit_passed", "render_as": "alert_message", "show_status_icon": true },
+        { "field_id": "consistency_score", "render_as": "confidence_badge" },
+        { "field_id": "total_items", "render_as": "readonly_text" },
+        { "field_id": "passed_items", "render_as": "readonly_text", "class": "text-success" },
+        { "field_id": "warning_items", "render_as": "readonly_text", "class": "text-warning" },
+        { "field_id": "error_items", "render_as": "readonly_text", "class": "text-danger" }
+      ]
+    },
+    {
+      "section_id": "audit_details",
+      "layout": "table",
+      "collapsible": false,
+      "columns": [
+        { "col_id": "fee_type", "label": "费用类型", "width": "100px" },
+        { "col_id": "ai_amount", "label": "AI计算金额", "width": "120px", "align": "right" },
+        { "col_id": "bill_amount", "label": "账单金额", "width": "120px", "align": "right" },
+        { "col_id": "diff", "label": "差异", "width": "100px", "align": "right" },
+        { "col_id": "diff_rate", "label": "差异率", "width": "100px", "align": "right" },
+        { "col_id": "status", "label": "状态", "width": "80px" },
+        { "col_id": "severity", "label": "严重程度", "width": "80px" }
+      ],
+      "row_highlight": {
+        "ERROR": "#fee2e2",
+        "WARNING": "#fef9c3"
+      },
+      "striped": true
+    },
+    {
+      "section_id": "anomaly_details",
+      "layout": "table",
+      "collapsible": true,
+      "defaultCollapsed": false,
+      "title_suffix": "（需关注）",
+      "columns": [
+        { "col_id": "anomaly_type", "label": "异常类型", "width": "120px" },
+        { "col_id": "description", "label": "描述", "width": "250px" },
+        { "col_id": "suggestion", "label": "处理建议", "width": "200px" },
+        { "col_id": "action", "label": "操作", "width": "80px" }
+      ],
+      "row_actions": [
+        { "action_id": "view_detail", "label": "查看", "icon": "eye", "type": "default" },
+        { "action_id": "ignore", "label": "忽略", "icon": "close", "type": "default" }
+      ],
+      "empty_state": "无异常项"
+    },
+    {
+      "section_id": "audit_actions",
+      "layout": "card",
+      "collapsible": true,
+      "defaultCollapsed": true,
+      "fields": [
+        { "field_id": "auditor", "render_as": "readonly_text" },
+        { "field_id": "audit_time", "render_as": "readonly_text" },
+        { "field_id": "final_status", "render_as": "readonly_text" }
+      ]
+    }
+  ],
+  "system_actions_bar": {
+    "position": "bottom_fixed",
+    "background": "#ffffff",
+    "shadow": "0 -2px 8px rgba(0,0,0,0.1)",
+    "padding": "16px 24px",
+    "actions": [
+      { "action_id": "approve_bill", "render_as": "primary_button", "label": "通过审核", "icon": "check" },
+      { "action_id": "reject_bill", "render_as": "danger_button", "label": "驳回账单", "icon": "close" },
+      { "action_id": "export_report", "render_as": "secondary_button", "label": "导出审核报告", "icon": "download" }
+    ]
+  }
+}

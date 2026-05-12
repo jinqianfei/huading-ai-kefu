@@ -1,0 +1,23 @@
+{
+  "version": "2.0",
+  "name": "ai-kefu",
+  "database": {
+    "host": "localhost",
+    "port": 5432,
+    "name": "ai_cs_support",
+    "user": "postgres",
+    "password": "openclaw123"
+  },
+  "redis": {
+    "host": "localhost",
+    "port": 6380,
+    "password": "openclaw123",
+    "db": 0
+  },
+  "llm": {
+    "provider": "minimax",
+    "api_key": "sk-cp-BPe-rhzBNXOTnYScNWuiPNOaQv7jd4M3NxE6Xc5S_d_yiunNEYiyaWWUksirKd1s0LWKCPJOXcZPpOipNOaG_MyVAJUn7VfMfkF5LRYzTFepq2jHx8SFO9Q",
+    "base_url":"https://api.minimax.chat/v1",
+    "model": "abab6.5s-chat"
+  }
+}

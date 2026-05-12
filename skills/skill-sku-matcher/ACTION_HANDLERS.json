@@ -1,0 +1,82 @@
+{
+  "handlers": [
+    {
+      "action_id": "confirm_match",
+      "trigger": "button_click",
+      "request": {
+        "action": "CONFIRM_SKU_MATCH",
+        "payload": {
+          "task_id": "{{task_id}}",
+          "customer_id": "{{customer_id}}",
+          "customer_sku_code": "{{customer_sku_code}}",
+          "customer_sku_name": "{{customer_sku_name}}",
+          "system_sku_code": "{{system_sku_code}}",
+          "match_type": "{{match_type}}",
+          "confidence": "{{confidence}}"
+        }
+      },
+      "response_handling": {
+        "success": {
+          "render_type": "show_message",
+          "message": "匹配已确认，已记录到历史匹配表",
+          "message_type": "success"
+        }
+      },
+      "loading": {
+        "show": true,
+        "text": "正在保存匹配记录..."
+      }
+    },
+    {
+      "action_id": "select_alternative",
+      "trigger": "row_button_click",
+      "request": {
+        "action": "SELECT_ALTERNATIVE",
+        "payload": {
+          "task_id": "{{task_id}}",
+          "selected_sku_code": "{{row.system_sku_code}}",
+          "selected_sku_name": "{{row.system_sku_name}}"
+        }
+      },
+      "response_handling": {
+        "success": {
+          "render_type": "update_field",
+          "update_fields": {
+            "system_sku_code": "{{row.system_sku_code}}",
+            "system_sku_name": "{{row.system_sku_name}}",
+            "match_type": "MANUAL",
+            "confidence": 1.0,
+            "status": "MANUAL_MODIFIED"
+          },
+          "render_type_2": "show_message",
+          "message": "已选择该备选方案",
+          "message_type": "success"
+        }
+      },
+      "confirm": {
+        "required": false
+      }
+    },
+    {
+      "action_id": "manual_select",
+      "trigger": "button_click",
+      "request": {
+        "action": "SHOW_MANUAL_SELECT",
+        "payload": {
+          "task_id": "{{task_id}}",
+          "customer_id": "{{customer_id}}"
+        }
+      },
+      "response_handling": {
+        "success": {
+          "render_type": "refresh_table",
+          "table_section": "alternatives"
+        }
+      },
+      "loading": {
+        "show": true,
+        "text": "正在加载可选SKU列表..."
+      }
+    }
+  ]
+}

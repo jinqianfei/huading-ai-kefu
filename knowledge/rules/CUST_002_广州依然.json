@@ -1,0 +1,164 @@
+{
+  "customer_id": "CUST_002",
+  "customer_name": "广州依然供应链管理有限公司",
+  "contract_no": "HDLL-CP-2024-091",
+  "contract_date": "",
+  "effective_date": "2026-01-01",
+  "valid_to": "2026-12-31",
+  "结算专员": "孙金凤",
+  "confirmed": false,
+  "confirmed_at": null,
+  "tax_rates": {
+    "仓储": 0.06,
+    "运输": 0.09
+  },
+
+  "billing_mode": {
+    "mode": "standard_unit",
+    "description": "标准件计费，30天为一周期",
+    "billing_unit": "标准件",
+    "storage_period_days": 30
+  },
+
+  "rules": {
+    "storage": {
+      "description": "仓储费规则（标准件模式）",
+      "billing_unit": "标准件",
+      "period_days": 30,
+      "operation_mode": "included",
+      "operation_note": "费用包含装卸、入库分拣、理货等",
+      "overdue_enabled": true,
+      "overdue_grace_days": 30,
+      "overdue_fee_per_unit": 0.1,
+      "overdue_unit": "元/件/天",
+      "pricing": {
+        "泉州仓": {
+          "常温": { "price": 4.0, "unit": "元/件/30天", "note": "含装卸、入库分拣、理货" },
+          "冷藏": { "price": 4.5, "unit": "元/件/30天" },
+          "冷冻": { "price": 4.5, "unit": "元/件/30天" }
+        },
+        "广州仓": {
+          "常温": { "price": 4.0, "unit": "元/件/30天", "note": "含装卸、入库分拣、理货" },
+          "冷藏": { "price": 4.5, "unit": "元/件/30天" },
+          "冷冻": { "price": 4.5, "unit": "元/件/30天" }
+        },
+        "长沙仓": {
+          "常温": { "price": 4.0, "unit": "元/件/30天", "note": "含装卸、入库分拣、理货" },
+          "冷藏": { "price": 4.5, "unit": "元/件/30天" },
+          "冷冻": { "price": 4.5, "unit": "元/件/30天" }
+        }
+      }
+    },
+
+    "value_added": {
+      "混装分拣费": { "price": 0.5, "unit": "元/件", "note": "货物到货时按多批次、批号等分拣" },
+      "拆零分拣费": { "price": 0.3, "unit": "元/最小单位", "note": "按包装小单位数量计费" }
+    },
+
+    "transfer": {
+      "description": "调拨报价（仓库间调拨）- 暂无数据"
+    },
+
+    "delivery": {
+      "description": "共配报价（仓库到门店）",
+      "pricing_type": "分区间",
+      "standard_unit_rule": "单件≤15kg且≤0.05m³为1标准件",
+      "min_order_qty": 10,
+      "min_order_qty_by_warehouse": {
+        "广州仓": 10,
+        "泉州仓": 10,
+        "长沙仓": 15
+      },
+      "min_order_qty_billing_mode": "按起运量计费",
+      "min_fee": null,
+      "min_fee_rule": "不足起运量按起运量计费",
+      "unit": "元/标准件",
+      "included_in_storage": false,
+      "routes": {
+        "泉州仓": {
+          "泉州福州厦门区域": { "price": 5, "min_qty": 10, "配送周期": "一周两配", "时效": "1-2天" },
+          "福建省内其他地区": { "price": 9, "min_qty": 10, "配送周期": "一周两配", "时效": "1-2天" }
+        },
+        "广州仓": {
+          "广深珠莞佛区域": { "price": 5, "min_qty": 10, "配送周期": "一周两配", "时效": "1-2天" },
+          "珠中惠江肇区域": { "price": 9, "min_qty": 10, "配送周期": "一周两配", "时效": "1-2天" },
+          "广东省内其他区域": { "price": 13, "min_qty": 10, "配送周期": "一周两配", "时效": "1-2天" },
+          "广西区域": { "price": 16, "min_qty": 15, "配送周期": "待确认", "时效": "待确认" }
+        },
+        "长沙仓": {
+          "长沙市区": { "price": 4, "min_qty": 10, "配送周期": "一周两配", "时效": "1-2天" },
+          "湖南省其他区域": { "price": 9.5, "min_qty": 10, "配送周期": "一周两配", "时效": "1-2天" },
+          "贵州区域": { "price": 16, "min_qty": 15, "配送周期": "待确认", "时效": "待确认" }
+        }
+      }
+    },
+
+    "oversized": {
+      "description": "超规格计费规则",
+      "standard_threshold": "重量≤15kg 且 体积≤0.05m³",
+      "tiers": [
+        {
+          "tier": 1,
+          "threshold": "15kg<重量≤25kg 或 0.05m³<体积≤0.08m³",
+          "coef": 1.2,
+          "name": "超规格一"
+        },
+        {
+          "tier": 2,
+          "threshold": "25kg<重量≤30kg 或 0.08m³<体积≤0.1m³",
+          "coef": 2.0,
+          "name": "超规格二"
+        },
+        {
+          "tier": 3,
+          "threshold": "重量>30kg 或 体积>0.1m³",
+          "coef": "max(重量/15, 体积/0.05)",
+          "name": "超大超重件"
+        }
+      ],
+      "billing_rule": "取 max(重量/15, 体积/0.05) 与等级系数中的较大值"
+    },
+
+    "standard_unit": {
+      "max_weight_kg": 15,
+      "max_volume_m3": 0.05,
+      "calculation_rule": "max(重量/max_weight, 体积/max_volume)，向上取整"
+    },
+
+    "product_coefficients": {
+      "description": "产品固定系数（优先于标准件规则）",
+      "coefficient_unit": "倍",
+      "products": {}
+    },
+
+    "special": {
+      "上楼费": "门店若指引车辆至门店最近距离仓库交接，无需上楼费",
+      "交通管制": "若由于防疫、疫情、演习或交通管制导致无法到达，由收货人在周边或高速口交接",
+      "订单取消": "订单如在完成分捡包装或装车后取消，按搬运单价/件扣费；重新入库按原入库日期计算租期"
+    },
+
+    "rebate_discount": {
+      "type": "无",
+      "conditions": null,
+      "ratio": null
+    }
+  },
+
+  "notes": [
+    "计费模式：标准件计费，30天为一周期",
+    "操作费已含在存储费中，包含装卸、入库分拣、理货等",
+    "超期费：超出30天周转期后，按0.1元/件/天计收",
+    "运输费不足起运量按起运量计费",
+    "超规格件按计费系数（1.2/2.0倍）计费，超大件按 max(重量/15, 体积/0.05) 计算",
+    "含税价：仓储6%增值税，运输9%增值税"
+  ],
+
+  "source_images": [
+    "41e380ca-59d1-4674-9e71-1510199c36c5.jpg",
+    "560026dd-99e6-471b-af6c-74a1afc77207.jpg"
+  ],
+
+  "version": "2.2.0",
+  "updated_at": "2026-05-09",
+  "extraction_method": "合同图片AI识别提取"
+}

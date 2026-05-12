@@ -1,0 +1,46 @@
+{
+  "skill_id": "skill-sku-matcher",
+  "version": "1.0.0",
+  "description": "客户商品编码/名称 → 系统SKU编码的智能匹配",
+  "input_fields": [
+    {
+      "field_id": "customer_id",
+      "type": "select",
+      "label": "选择客户",
+      "options_source": "api:/customers",
+      "searchable": true,
+      "required": true,
+      "placeholder": "请输入客户名称搜索"
+    },
+    {
+      "field_id": "customer_sku_code",
+      "type": "text",
+      "label": "客户商品编码",
+      "placeholder": "输入客户商品编码，如 P1556689351",
+      "required": false,
+      "description": "有编码时优先按编码精确匹配"
+    },
+    {
+      "field_id": "customer_sku_name",
+      "type": "text",
+      "label": "客户商品名称",
+      "placeholder": "输入客户商品名称",
+      "required": false,
+      "description": "无编码时按商品名称语义匹配"
+    },
+    {
+      "field_id": "quantity",
+      "type": "number",
+      "label": "数量",
+      "min": 0,
+      "required": false
+    },
+    {
+      "field_id": "fallback_semantic",
+      "type": "checkbox",
+      "label": "精确匹配失败时降级语义匹配",
+      "default": true,
+      "required": false
+    }
+  ]
+}

@@ -1,0 +1,56 @@
+{
+  "skill_id": "skill-order-template-converter",
+  "version": "1.1.0",
+  "description": "将客户非标准订单Excel/截图转换为华鼎标准出库单格式，支持31字段模板填充和pending字段处理",
+  "input_fields": [
+    {
+      "field_id": "order_file",
+      "type": "file",
+      "label": "上传订单文件",
+      "accepted_formats": [".xlsx", ".xls", ".pdf", ".png", ".jpg", ".jpeg"],
+      "max_size_mb": 50,
+      "required": true,
+      "description": "支持Excel、PDF、图片格式，单个文件不超过50MB"
+    },
+    {
+      "field_id": "customer_id",
+      "type": "select",
+      "label": "选择客户",
+      "options_source": "api:/customers",
+      "searchable": true,
+      "required": true,
+      "placeholder": "请输入客户名称搜索"
+    },
+    {
+      "field_id": "order_type",
+      "type": "radio",
+      "label": "订单类型",
+      "options": [
+        { "value": "standard", "label": "标准配送单" },
+        { "value": "self_pickup", "label": "顾客自提" },
+        { "value": "combined", "label": "合单" }
+      ],
+      "required": true,
+      "default": "standard"
+    },
+    {
+      "field_id": "include_pending_fields",
+      "type": "switch",
+      "label": "包含待确认字段",
+      "required": false,
+      "default": false,
+      "description": "开启后，系统会填充待确认字段（pending字段）并标记为黄色高亮，需人工复核确认"
+    },
+    {
+      "field_id": "pending_task_ids",
+      "type": "multi_select",
+      "label": "关联Pending任务",
+      "required": false,
+      "options_source": "api:/pending-tasks",
+      "searchable": true,
+      "placeholder": "选择需要处理的pending任务",
+      "description": "选择需要填充的pending字段对应的任务ID，用于批量处理历史pending数据",
+      "visible_when": { "field": "include_pending_fields", "equals": true }
+    }
+  ]
+}

@@ -1,0 +1,40 @@
+{
+  "skill_id": "skill-bill-audit",
+  "version": "1.0.0",
+  "description": "AI审核账单，标红异常项，与合同规则逐一比对",
+  "input_fields": [
+    {
+      "field_id": "bill_no",
+      "type": "text",
+      "label": "账单编号",
+      "placeholder": "输入账单编号，如：BILL-202604-001",
+      "required": true
+    },
+    {
+      "field_id": "customer_id",
+      "type": "select",
+      "label": "选择客户",
+      "options_source": "api:/customers",
+      "searchable": true,
+      "required": true
+    },
+    {
+      "field_id": "billing_period",
+      "type": "month",
+      "label": "账期",
+      "required": true
+    },
+    {
+      "field_id": "audit_scope",
+      "type": "radio",
+      "label": "审核范围",
+      "options": [
+        { "value": "full", "label": "完整审核（全部费用项）" },
+        { "value": "amount_only", "label": "仅金额审核" },
+        { "value": "anomaly_only", "label": "仅异常项" }
+      ],
+      "default": "full",
+      "required": true
+    }
+  ]
+}
