@@ -15,7 +15,7 @@ from typing import Dict, Any, Optional
 class OrderToHuadingTemplate:
     """订单转华鼎出库单模板Skill"""
     
-    VERSION = "1.2"
+    VERSION = "1.3"
     
     # 华鼎模板31字段
     HUADING_FIELDS = [
@@ -92,10 +92,20 @@ class OrderToHuadingTemplate:
             return {}
     
     def _get_warehouse_code(self, warehouse_name: str) -> str:
-        """获取仓库编码"""
+        """获取仓库编码，找不到则报错"""
         if not warehouse_name:
-            return ""
-        return self.warehouse_code_map.get(warehouse_name, "")
+            raise ValueError(f"门店的仓库名称为空，请检查门店数据")
+        
+        warehouse_code = self.warehouse_code_map.get(warehouse_name)
+        if not warehouse_code:
+            available = ", ".join(self.warehouse_code_map.keys())
+            raise ValueError(
+                f"仓库'{warehouse_name}'在仓库编码映射表中未找到！\n"
+                f"请检查仓库编码表，确保该仓库已配置。\n"
+                f"当前可用的仓库：{available}"
+            )
+        
+        return warehouse_code
     
     def execute(self, order_file: str, output_file: str = None) -> Dict[str, Any]:
         """
