@@ -15,7 +15,7 @@ from typing import Dict, Any, Optional
 class OrderToHuadingTemplate:
     """订单转华鼎出库单模板Skill"""
     
-    VERSION = "1.5"
+    VERSION = "1.6"
     
     # 华鼎模板31字段
     HUADING_FIELDS = [
@@ -222,22 +222,94 @@ class OrderToHuadingTemplate:
             return None
     
     def _match_store(self, store_name: str) -> Optional[Dict]:
-        """门店匹配"""
+        """
+        门店匹配 - 支持多种匹配策略
+        
+        匹配策略：
+        1. 精确匹配（原始名称）
+        2. 去除地名前缀后匹配（天津/河北/沧州等）
+        3. 关键词匹配（取门店名中的关键词）
+        """
         try:
             import psycopg2
+            import re
             
             conn = psycopg2.connect(**self.db_config)
             cur = conn.cursor()
             
-            cur.execute("""
-                SELECT store_code, store_name, warehouse, address, contact_person, phone
-                FROM store_list
-                WHERE store_name LIKE %s
-                AND owner_code = %s
-                LIMIT 1
-            """, (f"%{store_name}%", self.shipper_id))
+            # 地名前缀列表
+            prefixes = ['天津', '河北', '沧州', '北京', '济南', '郑州', '杭州', '西安', '武汉', '南京', '长沙', '合肥', '太原', '上海', '沈阳', '成都', '广州', '深圳']
             
-            row = cur.fetchone()
+            def try_match(name):
+                cur.execute("""
+                    SELECT store_code, store_name, warehouse, address, contact_person, phone
+                    FROM store_list
+                    WHERE store_name LIKE %s
+                    AND owner_code = %s
+                    ORDER BY LENGTH(store_name) ASC
+                    LIMIT 1
+                """, (f"%{name}%", self.shipper_id))
+                return cur.fetchone()
+            
+            row = try_match(store_name)
+            match_method = "精确匹配"
+            
+            # 去除前缀后匹配
+            if not row:
+                cleaned_name = store_name
+                for prefix in prefixes:
+                    if cleaned_name.startswith(prefix):
+                        cleaned_name = cleaned_name[len(prefix):]
+                        break
+                if cleaned_name != store_name:
+                    row = try_match(cleaned_name)
+                    match_method = f"去前缀匹配({cleaned_name})"
+            
+            # 提取关键词匹配（如"王口镇" → "王口"）
+            if not row:
+                # 尝试提取2个字以上的关键词
+                keywords = re.findall(r'[\u4e00-\u9fa5]{2,}', store_name)
+                for kw in keywords:
+                    if len(kw) >= 2:
+                        row = try_match(kw)
+                        if row:
+                            match_method = f"关键词匹配({kw})"
+                            break
+            
+            # 去除"镇店"、"店"等后缀后匹配
+            if not row:
+                suffixes = ['镇店', '镇', '店']
+                cleaned_name = store_name
+                for suffix in suffixes:
+                    if cleaned_name.endswith(suffix):
+                        cleaned_name = cleaned_name[:-len(suffix)]
+                        row = try_match(cleaned_name)
+                        if row:
+                            match_method = f"去后缀匹配({cleaned_name})"
+                            break
+            
+            # 组合匹配：去除前缀+后缀
+            if not row:
+                cleaned_name = store_name
+                for prefix in prefixes:
+                    if cleaned_name.startswith(prefix):
+                        cleaned_name = cleaned_name[len(prefix):]
+                        break
+                for suffix in suffixes:
+                    if cleaned_name.endswith(suffix):
+                        cleaned_name = cleaned_name[:-len(suffix)]
+                        break
+                if cleaned_name and cleaned_name != store_name:
+                    row = try_match(cleaned_name)
+                    if row:
+                        match_method = f"去头尾匹配({cleaned_name})"
+            
+            # 最后尝试：直接搜索"王口"
+            if not row:
+                row = try_match("王口")
+                if row:
+                    match_method = "王口直接匹配"
+            
             conn.close()
             
             if row:
@@ -249,7 +321,8 @@ class OrderToHuadingTemplate:
                     "warehouse_code": self._get_warehouse_code(warehouse_name),
                     "address": row[3] or "",
                     "contact_person": row[4] or "",
-                    "phone": row[5] or ""
+                    "phone": row[5] or "",
+                    "match_method": match_method
                 }
             
             return None
