@@ -15,7 +15,7 @@ from typing import Dict, Any, Optional
 class OrderToHuadingTemplate:
     """订单转华鼎出库单模板Skill"""
     
-    VERSION = "1.3"
+    VERSION = "1.4"
     
     # 华鼎模板31字段
     HUADING_FIELDS = [
@@ -116,7 +116,15 @@ class OrderToHuadingTemplate:
             output_file: 输出文件路径
         
         Returns:
-            Dict包含 success, output_file, order_no, store_code, item_count, message
+            Dict包含:
+            - success: 是否成功
+            - output_file: 输出文件路径
+            - order_no: 订单号
+            - store_code: 门店编号
+            - warehouse_code: 仓库编码
+            - item_count: 商品数量
+            - unmatched_items: 未匹配SKU的商品列表
+            - message: 消息
         """
         try:
             if not os.path.exists(order_file):
@@ -127,13 +135,22 @@ class OrderToHuadingTemplate:
                 return {"success": False, "message": "订单解析失败"}
             
             store_info = self._match_store(order_data["store_name"])
-            sku_results = self._match_sku(order_data["items"])
+            sku_results, unmatched_items = self._match_sku(order_data["items"])
             
             if not output_file:
                 order_no_safe = order_data["order_no"].replace("/", "-").replace("\\", "-")
                 output_file = os.path.join(self.output_dir, f"华鼎出库单_{order_no_safe}.xlsx")
             
             self._generate_template(order_data, store_info, sku_results, output_file)
+            
+            # 构建返回消息
+            message = "模板生成成功"
+            if unmatched_items:
+                unmatched_details = []
+                for item in unmatched_items:
+                    details = f"序号{item['seq']}: {item['product_name']} | 编码:{item['product_code']} | 规格:{item['spec']} | 数量:{item['quantity']}件"
+                    unmatched_details.append(details)
+                message = f"模板生成成功，但有{len(unmatched_items)}条商品未匹配SKU：" + "; ".join(unmatched_details)
             
             return {
                 "success": True,
@@ -142,7 +159,9 @@ class OrderToHuadingTemplate:
                 "store_code": store_info.get("store_code", "") if store_info else "",
                 "warehouse_code": self._get_warehouse_code(store_info.get("warehouse_name", "")) if store_info else "",
                 "item_count": len(sku_results),
-                "message": "模板生成成功"
+                "unmatched_count": len(unmatched_items),
+                "unmatched_items": unmatched_items,
+                "message": message
             }
             
         except Exception as e:
@@ -168,17 +187,27 @@ class OrderToHuadingTemplate:
                 if pd.isna(seq) or str(seq) == "合计：":
                     continue
                 
+                product_code = str(df_raw.iloc[i, 1]) if pd.notna(df_raw.iloc[i, 1]) else ""
                 product_name = str(df_raw.iloc[i, 2]) if pd.notna(df_raw.iloc[i, 2]) else ""
                 if not product_name or product_name == "nan":
                     continue
                 
+                # 商品规格（可能是第3列或第4列）
+                spec = ""
+                if pd.notna(df_raw.iloc[i, 3]):
+                    spec = str(df_raw.iloc[i, 3]).replace("规格：", "").replace("件：", "").strip()
+                
                 quantity = df_raw.iloc[i, 5] if pd.notna(df_raw.iloc[i, 5]) else 0
+                unit = str(df_raw.iloc[i, 6]) if pd.notna(df_raw.iloc[i, 6]) else "件"
                 remark = df_raw.iloc[i, 8] if pd.notna(df_raw.iloc[i, 8]) else ""
                 
                 items.append({
                     "seq": int(seq) if isinstance(seq, (int, float)) else 1,
+                    "product_code": product_code,
                     "product_name": product_name,
+                    "spec": spec,
                     "quantity": int(quantity) if isinstance(quantity, (int, float)) else 0,
+                    "unit": unit,
                     "remark": str(remark).strip()
                 })
             
@@ -229,8 +258,15 @@ class OrderToHuadingTemplate:
             print(f"门店匹配错误: {e}")
             return None
     
-    def _match_sku(self, items: list) -> list:
-        """SKU匹配"""
+    def _match_sku(self, items: list) -> tuple:
+        """
+        SKU匹配
+        
+        Returns:
+            (results, unmatched_items)
+            - results: 匹配成功的商品列表
+            - unmatched_items: 未匹配的商品列表（包含完整原始信息）
+        """
         try:
             import psycopg2
             
@@ -238,6 +274,8 @@ class OrderToHuadingTemplate:
             cur = conn.cursor()
             
             results = []
+            unmatched_items = []
+            
             for item in items:
                 sku_code = ""
                 unit_type = ""
@@ -272,22 +310,31 @@ class OrderToHuadingTemplate:
                 if row:
                     sku_code = row[0] or ""
                     unit_type = "大单位"
-                
-                results.append({
-                    "seq": item["seq"],
-                    "product_name": item["product_name"],
-                    "quantity": item["quantity"],
-                    "remark": item["remark"],
-                    "sku_code": sku_code,
-                    "unit_type": unit_type
-                })
+                    results.append({
+                        "seq": item["seq"],
+                        "product_name": item["product_name"],
+                        "quantity": item["quantity"],
+                        "remark": item["remark"],
+                        "sku_code": sku_code,
+                        "unit_type": unit_type
+                    })
+                else:
+                    # 未匹配，记录完整原始信息
+                    unmatched_items.append({
+                        "seq": item["seq"],
+                        "product_code": item.get("product_code", ""),
+                        "product_name": item["product_name"],
+                        "spec": item.get("spec", ""),
+                        "quantity": item["quantity"],
+                        "unit": item.get("unit", "件")
+                    })
             
             conn.close()
-            return results
+            return results, unmatched_items
             
         except Exception as e:
             print(f"SKU匹配错误: {e}")
-            return items
+            return items, []
     
     def _generate_template(self, order_data: Dict, store_info: Optional[Dict], 
                           sku_results: list, output_file: str):
