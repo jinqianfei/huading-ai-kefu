@@ -15,7 +15,7 @@ from typing import Dict, Any, Optional
 class OrderToHuadingTemplate:
     """订单转华鼎出库单模板Skill"""
     
-    VERSION = "1.4"
+    VERSION = "1.5"
     
     # 华鼎模板31字段
     HUADING_FIELDS = [
@@ -258,14 +258,38 @@ class OrderToHuadingTemplate:
             print(f"门店匹配错误: {e}")
             return None
     
+    def _clean_product_name(self, name: str) -> str:
+        """
+        清理商品名称，去除特殊字符用于匹配
+        
+        处理规则：
+        - 去除首尾特殊字符（-、/、.等）
+        - 去除括号及其内容
+        - 去除空格
+        """
+        import re
+        # 去除首尾的特殊字符
+        name = name.strip().rstrip('-').rstrip('/').rstrip('.')
+        # 去除括号及其内容
+        name = re.sub(r'[（(].*[)）]', '', name)
+        # 去除空格
+        name = name.strip()
+        return name
+    
     def _match_sku(self, items: list) -> tuple:
         """
-        SKU匹配
+        SKU匹配 - 多层匹配策略
+        
+        匹配优先级：
+        1. 精确匹配（商品名称完全相同）
+        2. 清理后匹配（去除特殊字符）
+        3. 前缀匹配（订单名称是系统名称的前缀）
+        4. 后缀匹配（订单名称是系统名称的后缀）
+        5. 包含匹配（订单名称包含在系统名称中）
+        6. 反向包含（系统名称包含订单名称）
         
         Returns:
             (results, unmatched_items)
-            - results: 匹配成功的商品列表
-            - unmatched_items: 未匹配的商品列表（包含完整原始信息）
         """
         try:
             import psycopg2
@@ -279,8 +303,11 @@ class OrderToHuadingTemplate:
             for item in items:
                 sku_code = ""
                 unit_type = ""
+                match_method = ""
                 
-                # 精确匹配
+                original_name = item["product_name"]
+                
+                # ========== 1. 精确匹配 ==========
                 cur.execute("""
                     SELECT system_sku_code,
                            (unit_conversion_rule->>'ratio')::numeric as ratio
@@ -289,13 +316,86 @@ class OrderToHuadingTemplate:
                     AND shipper_id = %s
                     ORDER BY ratio DESC
                     LIMIT 1
-                """, (item["product_name"], self.shipper_id))
-                
+                """, (original_name, self.shipper_id))
                 row = cur.fetchone()
+                if row:
+                    sku_code = row[0]
+                    match_method = "精确匹配"
                 
-                # 模糊匹配
+                # ========== 2. 清理后匹配（去除特殊字符）==========
                 if not row:
-                    clean_name = item["product_name"].split("（")[0].split("(")[0].strip()
+                    clean_name = self._clean_product_name(original_name)
+                    if clean_name != original_name:
+                        cur.execute("""
+                            SELECT system_sku_code,
+                                   (unit_conversion_rule->>'ratio')::numeric as ratio
+                            FROM shipper_sku_mapping 
+                            WHERE customer_sku_name = %s 
+                            AND shipper_id = %s
+                            ORDER BY ratio DESC
+                            LIMIT 1
+                        """, (clean_name, self.shipper_id))
+                        row = cur.fetchone()
+                        if row:
+                            sku_code = row[0]
+                            match_method = f"清理匹配('{original_name}'→'{clean_name}')"
+                
+                # ========== 3. 前缀匹配 ==========
+                if not row:
+                    clean_name = self._clean_product_name(original_name)
+                    cur.execute("""
+                        SELECT system_sku_code,
+                               (unit_conversion_rule->>'ratio')::numeric as ratio
+                        FROM shipper_sku_mapping 
+                        WHERE customer_sku_name LIKE %s
+                        AND shipper_id = %s
+                        AND customer_sku_name != %s
+                        ORDER BY ratio DESC
+                        LIMIT 1
+                    """, (f"{clean_name}%", self.shipper_id, clean_name))
+                    row = cur.fetchone()
+                    if row:
+                        sku_code = row[0]
+                        match_method = f"前缀匹配"
+                
+                # ========== 4. 后缀匹配 ==========
+                if not row:
+                    clean_name = self._clean_product_name(original_name)
+                    cur.execute("""
+                        SELECT system_sku_code,
+                               (unit_conversion_rule->>'ratio')::numeric as ratio
+                        FROM shipper_sku_mapping 
+                        WHERE customer_sku_name LIKE %s
+                        AND shipper_id = %s
+                        AND customer_sku_name != %s
+                        ORDER BY ratio DESC
+                        LIMIT 1
+                    """, (f"%{clean_name}", self.shipper_id, clean_name))
+                    row = cur.fetchone()
+                    if row:
+                        sku_code = row[0]
+                        match_method = f"后缀匹配"
+                
+                # ========== 5. 包含匹配 ==========
+                if not row:
+                    clean_name = self._clean_product_name(original_name)
+                    cur.execute("""
+                        SELECT system_sku_code,
+                               (unit_conversion_rule->>'ratio')::numeric as ratio
+                        FROM shipper_sku_mapping 
+                        WHERE %s LIKE '%' || customer_sku_name || '%'
+                        AND shipper_id = %s
+                        ORDER BY ratio DESC
+                        LIMIT 1
+                    """, (clean_name, self.shipper_id))
+                    row = cur.fetchone()
+                    if row:
+                        sku_code = row[0]
+                        match_method = f"包含匹配"
+                
+                # ========== 6. 反向包含 ==========
+                if not row:
+                    clean_name = self._clean_product_name(original_name)
                     cur.execute("""
                         SELECT system_sku_code,
                                (unit_conversion_rule->>'ratio')::numeric as ratio
@@ -306,9 +406,11 @@ class OrderToHuadingTemplate:
                         LIMIT 1
                     """, (f"%{clean_name}%", self.shipper_id))
                     row = cur.fetchone()
+                    if row:
+                        sku_code = row[0]
+                        match_method = f"反向包含"
                 
                 if row:
-                    sku_code = row[0] or ""
                     unit_type = "大单位"
                     results.append({
                         "seq": item["seq"],
@@ -316,7 +418,8 @@ class OrderToHuadingTemplate:
                         "quantity": item["quantity"],
                         "remark": item["remark"],
                         "sku_code": sku_code,
-                        "unit_type": unit_type
+                        "unit_type": unit_type,
+                        "match_method": match_method
                     })
                 else:
                     # 未匹配，记录完整原始信息
