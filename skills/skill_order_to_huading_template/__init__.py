@@ -891,6 +891,31 @@ class OrderToHuadingTemplate:
                 if len(df_raw) > 3:
                     phone = str(df_raw.iloc[3, col_idx]) if pd.notna(df_raw.iloc[3, col_idx]) else ""
             
+            # Fallback: 如果col_mapping中没有store_name等字段，直接从固定位置读取
+            if not store_name and len(df_raw) > 2 and len(df_raw.columns) > 1:
+                # 门店名通常在 row=2, col=1
+                val = df_raw.iloc[2, 1]
+                if pd.notna(val):
+                    store_name = str(val).strip()
+            
+            if not order_no and len(df_raw) > 1 and len(df_raw.columns) > 1:
+                # 订单号通常在 row=1, col=1
+                val = df_raw.iloc[1, 1]
+                if pd.notna(val):
+                    order_no = str(val).strip()
+            
+            if not contact_person and len(df_raw) > 2:
+                # 联系人通常在 row=2, col=6
+                val = df_raw.iloc[2, 6]
+                if pd.notna(val):
+                    contact_person = str(val).strip()
+            
+            if not phone and len(df_raw) > 3:
+                # 电话通常在 row=3, col=6
+                val = df_raw.iloc[3, 6]
+                if pd.notna(val):
+                    phone = str(val).strip()
+            
             # 清理门店名称（去掉前缀）
             for prefix in ['河北-', '天津-', '沧州-']:
                 if store_name.startswith(prefix):
@@ -1018,6 +1043,7 @@ class OrderToHuadingTemplate:
                 1. 先做整体相似度（SequenceMatcher）
                 2. 如果短串是长串的前缀/包含，额外加分
                 3. 清理品牌前缀后再比较
+                4. 核心关键词匹配（地名/店名等）加分
                 """
                 if not s1 or not s2:
                     return 0.0
@@ -1039,15 +1065,30 @@ class OrderToHuadingTemplate:
                 
                 # 2. 包含匹配加分（短串是长串的前缀/包含）
                 # 确保s1是较短的串
-                if len(s1_cleaned) > len(s2_cleaned):
-                    s1_cleaned, s2_cleaned = s2_cleaned, s1_cleaned
+                shorter = s1_cleaned if len(s1_cleaned) <= len(s2_cleaned) else s2_cleaned
+                longer = s2_cleaned if len(s1_cleaned) <= len(s2_cleaned) else s1_cleaned
                 
-                if s1_cleaned and s1_cleaned in s2_cleaned:
+                contain_bonus = 0.0
+                if shorter and shorter in longer:
                     # 包含匹配相似度 = 短串长度/长串长度 + 0.3
-                    contain_sim = len(s1_cleaned) / len(s2_cleaned) + 0.3
-                    return max(base_sim, min(contain_sim, 1.0))  # 上限1.0
+                    contain_bonus = len(shorter) / len(longer) + 0.3
                 
-                return base_sim
+                # 3. 核心关键词匹配（地名关键词）
+                # 提取关键位置词：省/市/区/县/镇/乡/村/店等
+                location_pattern = r'[\u4e00-\u9fa5]{2,6}(?:省|市|区|县|镇|乡|村|街|路|店|仓|口)'
+                import re
+                loc1 = set(re.findall(location_pattern, s1_cleaned))
+                loc2 = set(re.findall(location_pattern, s2_cleaned))
+                
+                keyword_bonus = 0.0
+                if loc1 and loc2:
+                    # 有共同关键词则加分
+                    common = loc1 & loc2
+                    if common:
+                        # 每个共同关键词加0.2，最高0.6
+                        keyword_bonus = min(len(common) * 0.2, 0.6)
+                
+                return max(base_sim, contain_bonus, base_sim + keyword_bonus)
             
             def try_exact_match(name):
                 """精确匹配：store_name = 输入名称"""
@@ -1060,18 +1101,45 @@ class OrderToHuadingTemplate:
                 return cur.fetchone()
             
             def try_fuzzy_match(name, top_n=5):
-                """模糊匹配：返回多个候选，按相似度排序"""
+                """模糊匹配：返回多个候选，按相似度排序
+                
+                策略：
+                1. 先用完整名称LIKE查询
+                2. 如果没有结果，拆分为关键词逐个查询后合并去重
+                """
+                all_rows = []
+                
+                # 第1步：完整名称LIKE
                 cur.execute("""
                     SELECT store_code, store_name, warehouse, address, contact_person, phone, owner_code
                     FROM store_list
                     WHERE store_name LIKE %s
                     LIMIT 50
                 """, (f"%{name}%",))
-                rows = cur.fetchall()
+                all_rows = list(cur.fetchall())
+                
+                # 第2步：如果没有结果，提取关键词分别查询
+                if not all_rows:
+                    # 提取2-4个字的中文关键词
+                    import re
+                    keywords = re.findall(r'[\u4e00-\u9fa5]{2,4}', name)
+                    seen_codes = set()
+                    for kw in keywords:
+                        if len(kw) >= 2:
+                            cur.execute("""
+                                SELECT store_code, store_name, warehouse, address, contact_person, phone, owner_code
+                                FROM store_list
+                                WHERE store_name LIKE %s
+                                LIMIT 20
+                            """, (f"%{kw}%",))
+                            for row in cur.fetchall():
+                                if row[0] not in seen_codes:
+                                    all_rows.append(row)
+                                    seen_codes.add(row[0])
                 
                 # 计算相似度并排序
                 scored = []
-                for row in rows:
+                for row in all_rows:
                     db_name = row[1] or ""
                     sim = calc_similarity(name, db_name)
                     scored.append((sim, row))

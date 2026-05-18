@@ -8,17 +8,17 @@ SKU计费系数计算
 
 功能：
 1. 读取商品信息Excel
-2. 从规则库获取：标准件定义、固定SKU列表、超规格规则
+2. 从规则库获取：标准件定义、固定SKU列表、超规格规则（从合同提取）
 3. 对每个SKU计算计费系数：
    - 固定SKU → 系数 = 1.0
-   - 非固定SKU → 按超规格规则计算
+   - 非固定SKU → 按合同规定的超规格规则计算
 4. 在原Excel加一列"计费系数"，计算后覆盖
 
-标准件系数计算逻辑：
-- 标准件定义：≤15kg 且 ≤0.05m³ → 系数 = 1.0
-- 15kg<重量≤25kg 或 0.05m³<体积≤0.08m³ → 系数 = 1.2
-- 25kg<重量≤30kg 或 0.08m³<体积≤0.1m³ → 系数 = 2.0
-- 重量>30kg 或 体积>0.1m³ → 系数 = max(重量/15, 体积/0.05)
+超规格规则从合同提取（rules.oversized），包含：
+- 基准重量、基准体积
+- 各等级阈值（tier1/tier2/tier3 的重量和体积边界）
+- 各等级系数（tier1系数、tier2系数）
+- tier3使用公式 max(重量/基准重量, 体积/基准体积)
 """
 
 import sys
@@ -83,7 +83,8 @@ def calc_sku_coefficients(
     product_coefficients = rules.get('product_coefficients', {})
     standard_unit_def = product_coefficients.get('standard_unit_definition', {})
     fixed_skus = product_coefficients.get('fixed_skus', {})
-    oversized_rules = product_coefficients.get('oversized_rules', {})
+    # 超规格规则：优先从 rules.oversized 读取（v2.1+），兼容 product_coefficients.oversized_rules（旧版）
+    oversized_rules = rules.get('oversized') or product_coefficients.get('oversized_rules', {})
     
     # 标准件定义默认值
     max_weight = standard_unit_def.get('max_weight_kg', 15)
@@ -240,7 +241,9 @@ def calculate_coefficient(
         volume_m3 = max_volume  # 如果没有体积，按标准件体积计算
     
     # 4. 计算超规格系数
-    coef = compute_oversized_coefficient(weight_kg, volume_m3, max_weight, max_volume)
+    coef = compute_oversized_coefficient(
+        weight_kg, volume_m3, max_weight, max_volume, oversized_rules
+    )
     
     return coef
 
@@ -249,33 +252,80 @@ def compute_oversized_coefficient(
     weight_kg: float,
     volume_m3: float,
     max_weight: float = 15,
-    max_volume: float = 0.05
+    max_volume: float = 0.05,
+    oversized_rules: dict = None
 ) -> float:
     """
     计算超规格系数
     
-    超规格规则：
-    - 重量>30kg 或 体积>0.1m³ → max(重量/15, 体积/0.05)
-    - 25kg<重量≤30kg 或 0.08m³<体积≤0.1m³ → 2.0
-    - 15kg<重量≤25kg 或 0.05m³<体积≤0.08m³ → 1.2
-    - 重量≤15kg 且 体积≤0.05m³ → 1.0
-    """
-    # 判断是否超规格
-    weight_ratio = weight_kg / max_weight if max_weight > 0 else 0
-    volume_ratio = volume_m3 / max_volume if max_volume > 0 else 0
+    超规格规则从规则库提取（rules.oversized），结构如下：
+    {
+        "基准重量_kg": 15,
+        "基准体积_m3": 0.05,
+        "threshold_tier1": {"weight_kg": {"min": 15, "max": 25}, "volume_m3": {"min": 0.05, "max": 0.08}},
+        "threshold_tier2": {"weight_kg": {"min": 25, "max": 30}, "volume_m3": {"min": 0.08, "max": 0.1}},
+        "threshold_tier3": {"weight_kg": {"min": 30}, "volume_m3": {"min": 0.1}},
+        "coef_tier1": 1.2,
+        "coef_tier2": 2.0
+    }
     
-    # 判断体积等级
-    if volume_m3 > 0.1 or weight_kg > 30:
-        # 最严重超规格：使用公式
+    判断逻辑：任一维度达到更高等级，即用更高等级的系数
+    """
+    # 如果没有超规格规则，使用默认值（兼容旧规则库）
+    if not oversized_rules:
+        weight_ratio = weight_kg / max_weight if max_weight > 0 else 0
+        volume_ratio = volume_m3 / max_volume if max_volume > 0 else 0
+        
+        # tier3: 重量>30kg 或 体积>0.1m³
+        if volume_m3 > 0.1 or weight_kg > 30:
+            return max(weight_ratio, volume_ratio)
+        # tier2: 25kg<重量≤30kg 或 0.08m³<体积≤0.1m³
+        elif volume_m3 > 0.08 or weight_kg > 25:
+            return 2.0
+        # tier1: 15kg<重量≤25kg 或 0.05m³<体积≤0.08m³
+        elif volume_m3 > 0.05 or weight_kg > 15:
+            return 1.2
+        else:
+            return 1.0
+    
+    # 从规则库读取阈值
+    base_weight = oversized_rules.get('基准重量_kg', max_weight)
+    base_volume = oversized_rules.get('基准体积_m3', max_volume)
+    
+    tier1 = oversized_rules.get('threshold_tier1', {})
+    tier2 = oversized_rules.get('threshold_tier2', {})
+    tier3 = oversized_rules.get('threshold_tier3', {})
+    
+    coef_tier1 = oversized_rules.get('coef_tier1', 1.2)
+    coef_tier2 = oversized_rules.get('coef_tier2', 2.0)
+    
+    # 提取各等级阈值
+    t1_weight_min = tier1.get('weight_kg', {}).get('min', 15)
+    t1_weight_max = tier1.get('weight_kg', {}).get('max', 25)
+    t1_volume_min = tier1.get('volume_m3', {}).get('min', 0.05)
+    t1_volume_max = tier1.get('volume_m3', {}).get('max', 0.08)
+    
+    t2_weight_min = tier2.get('weight_kg', {}).get('min', 25)
+    t2_weight_max = tier2.get('weight_kg', {}).get('max', 50)
+    t2_volume_min = tier2.get('volume_m3', {}).get('min', 0.08)
+    t2_volume_max = tier2.get('volume_m3', {}).get('max', 0.1)
+    
+    t3_weight_min = tier3.get('weight_kg', {}).get('min', 50)
+    t3_volume_min = tier3.get('volume_m3', {}).get('min', 0.1)
+    
+    # 判断超规格等级（任一维度达到更高等级，即用更高等级）
+    # tier3: 重量>t3_min 或 体积>t3_min
+    if volume_m3 > t3_volume_min or weight_kg > t3_weight_min:
+        weight_ratio = weight_kg / base_weight if base_weight > 0 else 0
+        volume_ratio = volume_m3 / base_volume if base_volume > 0 else 0
         return max(weight_ratio, volume_ratio)
-    elif volume_m3 > 0.08 or weight_kg > 25:
-        # 第二等级
-        return 2.0
-    elif volume_m3 > 0.05 or weight_kg > 15:
-        # 第一等级
-        return 1.2
+    # tier2: (重量>t2_min 或 体积>t2_min) 且 未达到 tier3
+    elif (volume_m3 > t2_volume_min or weight_kg > t2_weight_min):
+        return coef_tier2
+    # tier1: (重量>t1_min 或 体积>t1_min) 且 未达到 tier2/tier3
+    elif (volume_m3 > t1_volume_min or weight_kg > t1_weight_min):
+        return coef_tier1
     else:
-        # 标准件
         return 1.0
 
 

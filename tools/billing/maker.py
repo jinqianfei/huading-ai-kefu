@@ -32,12 +32,13 @@ import json
 _tools_dir = os.path.dirname(os.path.abspath(__file__))
 _src_dir = os.path.join(_tools_dir, 'src')
 _knowledge_dir = os.path.expanduser("~/openclaw-workspaces/ai-kefu/knowledge")
-sys.path.insert(0, _src_dir)
+if _src_dir not in sys.path:
+    sys.path.insert(0, _src_dir)
 
 from calculator.transport import calc_transport_fee
 from calculator.transfer import calc_transfer_fee
 from calculator.storage import calc_storage_fee, get_storage_price
-
+from .calculator.sku_coefficient import compute_oversized_coefficient
 
 def make_bill(customer_id: str, period: str, excel_path: str = None) -> dict:
     """
@@ -187,6 +188,7 @@ def _calculate_all_fees(transport_data: list, storage_data: list, rules: dict) -
         std_units = _calc_standard_units(
             sku_code, product_name, weight_kg, volume_m3, qty,
             products_map, max_weight_kg, max_volume_m3,
+            oversized_rules=oversized_rules,
             product_coefficient=_get_product_coefficient_from_table(sku_code)
         )
         
@@ -258,6 +260,7 @@ def _calc_standard_units(sku_code: str, product_name: str, weight_kg: float,
                           volume_m3: float, qty: float,
                           products_map: dict, max_weight_kg: float, 
                           max_volume_m3: float,
+                          oversized_rules: dict = None,
                           product_coefficient: float = None) -> float:
     """
     计算标准件数
@@ -265,7 +268,7 @@ def _calc_standard_units(sku_code: str, product_name: str, weight_kg: float,
     优先级（v2.3）：
     1. 若有商品信息表的计费系数（calc_sku_coefficients计算后），直接使用
     2. 若SKU/品名在合同fixed_skus表中，系数固定为1.0
-    3. 否则按合同超规格规则: max(weight/max_weight, volume/max_volume)
+    3. 否则按合同超规格规则计算（使用 compute_oversized_coefficient）
     
     Args:
         sku_code: SKU编码
@@ -276,6 +279,7 @@ def _calc_standard_units(sku_code: str, product_name: str, weight_kg: float,
         products_map: 合同fixed_skus表
         max_weight_kg: 标准件最大重量
         max_volume_m3: 标准件最大体积
+        oversized_rules: 超规格规则（从合同提取，v2.1+格式）
         product_coefficient: 商品信息表中的计费系数（calc_sku_coefficients计算后）
     
     Returns:
@@ -302,11 +306,13 @@ def _calc_standard_units(sku_code: str, product_name: str, weight_kg: float,
                 # 固定SKU系数为1.0
                 return math.ceil(qty * 1.0)
     
-    # 3. 按合同超规格规则计算
+    # 3. 按合同超规格规则计算（使用 compute_oversized_coefficient）
     if weight_kg > 0 or volume_m3 > 0:
-        weight_std = weight_kg / max_weight_kg
-        volume_std = volume_m3 / max_volume_m3
-        std_units = max(weight_std, volume_std) * qty
+        # 使用 compute_oversized_coefficient 从 oversized_rules 读取阈值
+        coef = compute_oversized_coefficient(
+            weight_kg, volume_m3, max_weight_kg, max_volume_m3, oversized_rules
+        )
+        std_units = coef * qty
     else:
         # 无重量体积数据，默认1:1
         std_units = qty

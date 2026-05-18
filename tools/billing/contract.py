@@ -27,10 +27,10 @@
 - 标准件定义：合同约定的标准件体积/重量阈值（如 ≤15kg 且 ≤0.05m³）
 - 标准件系数：每个SKU的计费系数
   - 固定SKU：合同附件商品参数表中列出，系数固定为1.0，不适用超规格规则
-  - 非固定SKU：按超规格规则计算 max(重量/15kg, 体积/0.05m³)
+  - 非固定SKU：按超规格规则计算（阈值和系数从合同提取）
 
 【其他规则】
-- 超标件计费系数：15-25kg或0.05-0.08m³→1.2倍，25-50kg或0.08-0.1m³→2.0倍
+- 超标件计费系数：从合同提取 tier1/tier2/tier3 的阈值和系数
 - 困难配送加收20%
 - 送货进店费：1元/杯
 """
@@ -113,9 +113,10 @@ DEMO_CONTRACT = """
 三、特殊计费规则
 
 3.1 超标件计费系数
-- 15kg < 重量 ≤ 25kg 或 0.05m³ < 体积 ≤ 0.08m³：1.2倍
-- 25kg < 重量 ≤ 50kg 或 0.08m³ < 体积 ≤ 0.1m³：2.0倍
-- 重量 > 50kg 或 体积 > 0.1m³：按重量/15或体积/0.05取较大值
+- 标准件：≤15kg 且 ≤0.05m³ → 系数1.0
+- tier1：15kg < 重量 ≤ 25kg 或 0.05m³ < 体积 ≤ 0.08m³ → 1.2倍
+- tier2：25kg < 重量 ≤ 50kg 或 0.08m³ < 体积 ≤ 0.1m³ → 2.0倍
+- tier3：重量 > 50kg 或 体积 > 0.1m³ → 按 max(重量/15, 体积/0.05) 计算
 
 3.2 困难配送加收20%
 - 超市、商场、步行街等车辆无法进入区域
@@ -474,22 +475,168 @@ def _extract_delivery_rules(text: str) -> dict:
 
 
 def _extract_oversized_rules(text: str) -> dict:
-    """提取超标件计费系数"""
-    rules = {}
+    """
+    提取超标件计费系数
     
-    # 1.2倍规则
-    match = re.search(r'15kg\s*[<＜]\s*重量\s*[≤]\s*25kg.*?(\d+\.?\d*)\s*倍', text, re.DOTALL)
-    if match:
-        rules['tier1_coef'] = float(match.group(1))
-    else:
-        rules['tier1_coef'] = 1.2
+    支持灵活匹配合同中的超规格规则表述，例如：
+    - "15kg < 重量 ≤ 25kg 或 0.05m³ < 体积 ≤ 0.08m³ → 1.2倍"
+    - "20kg以下为标准件，20-30kg为1.2倍，30-50kg为2.0倍，超过50kg按公式计算"
+    - "超规格系数：重量>基准重量的1-2倍体积>基准体积的1-1.6倍按1.2倍计费"
     
-    # 2.0倍规则
-    match = re.search(r'25kg\s*[<＜]\s*重量\s*[≤]\s*50kg.*?(\d+\.?\d*)\s*倍', text, re.DOTALL)
-    if match:
-        rules['tier2_coef'] = float(match.group(1))
-    else:
-        rules['tier2_coef'] = 2.0
+    输出结构（v2.1）:
+    {
+        "基准重量_kg": 15,
+        "基准体积_m3": 0.05,
+        "threshold_tier1": {"weight_kg": {"min": 15, "max": 25}, "volume_m3": {"min": 0.05, "max": 0.08}},
+        "threshold_tier2": {"weight_kg": {"min": 25, "max": 50}, "volume_m3": {"min": 0.08, "max": 0.1}},
+        "threshold_tier3": {"weight_kg": {"min": 50}, "volume_m3": {"min": 0.1}},
+        "coef_tier1": 1.2,
+        "coef_tier2": 2.0
+    }
+    """
+    rules = {
+        "基准重量_kg": 15,
+        "基准体积_m3": 0.05,
+        "coef_tier1": 1.2,
+        "coef_tier2": 2.0
+    }
+    
+    # 1. 提取标准件定义（基准重量和基准体积）
+    # 匹配 "标准件：≤15kg 且 ≤0.05m³" 或 "15kg以下为标准件" 等
+    std_weight_patterns = [
+        r'标准件.*?(\d+(?:\.\d+)?)\s*kg',  # 标准件定义中含重量
+        r'基准重量.*?(\d+(?:\.\d+)?)\s*kg',
+    ]
+    for pattern in std_weight_patterns:
+        match = re.search(pattern, text, re.IGNORECASE)
+        if match:
+            rules["基准重量_kg"] = float(match.group(1))
+            break
+    
+    std_volume_patterns = [
+        r'(\d+(?:\.\d+)?)\s*m³.*?标准件',
+        r'标准件.*?(\d+(?:\.\d+)?)\s*m³',
+        r'基准体积.*?(\d+(?:\.\d+)?)\s*m³',
+    ]
+    for pattern in std_volume_patterns:
+        match = re.search(pattern, text, re.IGNORECASE)
+        if match:
+            rules["基准体积_m3"] = float(match.group(1))
+            break
+    
+    # 2. 提取 tier1 阈值和系数（灵活匹配）
+    # 匹配各种表述："15-25kg 1.2倍"、"15kg<重量≤25kg → 1.2" 等
+    tier1_threshold = {"weight_kg": {"min": None, "max": None}, "volume_m3": {"min": None, "max": None}}
+    
+    # 权重阈值：找 "Xkg < 重量 ≤ Ykg" 或 "X-Ykg" 或 "超过Xkg"
+    weight_range_patterns = [
+        r'(?:重量|kg)[^\d]*(\d+(?:\.\d+)?)\s*[<＜]\s*(?:重量\s*)?[≤]\s*(\d+(?:\.\d+)?)\s*kg',  # 15 < 重量 ≤ 25
+        r'(\d+(?:\.\d+)?)\s*[-–]\s*(\d+(?:\.\d+)?)\s*kg.*?(?:1\.2|1\.2倍|一倍二)',  # 15-25kg 且 1.2
+        r'超过\s*(\d+(?:\.\d+)?)\s*kg.*?(?:1\.2|1\.2倍|一倍二)',  # 超过15kg 且 1.2
+    ]
+    for pattern in weight_range_patterns:
+        match = re.search(pattern, text, re.IGNORECASE)
+        if match:
+            tier1_threshold["weight_kg"]["min"] = float(match.group(1))
+            tier1_threshold["weight_kg"]["max"] = float(match.group(2))
+            break
+    
+    # 体积阈值
+    volume_range_patterns = [
+        r'(?:体积|m³)[^\d]*(\d+(?:\.\d+)?)\s*[<＜]\s*(?:体积\s*)?[≤]\s*(\d+(?:\.\d+)?)\s*m³',
+        r'(\d+(?:\.\d+)?)\s*[-–]\s*(\d+(?:\.\d+)?)\s*m³.*?(?:1\.2|1\.2倍|一倍二)',
+        r'超过\s*(\d+(?:\.\d+)?)\s*m³.*?(?:1\.2|1\.2倍|一倍二)',
+    ]
+    for pattern in volume_range_patterns:
+        match = re.search(pattern, text, re.IGNORECASE)
+        if match:
+            tier1_threshold["volume_m3"]["min"] = float(match.group(1))
+            tier1_threshold["volume_m3"]["max"] = float(match.group(2))
+            break
+    
+    # 如果没找到具体阈值，用基准值推算
+    if tier1_threshold["weight_kg"]["min"] is None:
+        tier1_threshold["weight_kg"]["min"] = rules["基准重量_kg"]
+        tier1_threshold["weight_kg"]["max"] = rules["基准重量_kg"] * 1.67  # 约 25kg if base=15
+    if tier1_threshold["volume_m3"]["min"] is None:
+        tier1_threshold["volume_m3"]["min"] = rules["基准体积_m3"]
+        tier1_threshold["volume_m3"]["max"] = rules["基准体积_m3"] * 1.6  # 约 0.08m³ if base=0.05
+    
+    rules["threshold_tier1"] = tier1_threshold
+    
+    # tier1 系数
+    coef_patterns = [
+        r'(?:重量\s*)?[<>]\s*\d+(?:\.\d+)?\s*kg.*?(?:重量\s*)?[≤]\s*\d+(?:\.\d+)?\s*kg.*?(\d+(?:\.\d+)?)\s*倍',
+        r'(?:体积\s*)?[<>]\s*\d+(?:\.\d+)?\s*m³.*?(?:体积\s*)?[≤]\s*\d+(?:\.\d+)?\s*m³.*?(\d+(?:\.\d+)?)\s*倍',
+        r'(\d+(?:\.\d+)?)\s*倍.*?(?:15|\d+)\s*[-–]\s*(?:25|\d+)\s*kg',
+        r'(\d+(?:\.\d+)?)\s*倍.*?(?:0\.0\d|\d+(?:\.\d+)?)\s*[-–]\s*(?:0\.\d+|\d+(?:\.\d+)?)\s*m³',
+    ]
+    for pattern in coef_patterns:
+        match = re.search(pattern, text, re.IGNORECASE)
+        if match:
+            coef = float(match.group(1))
+            if 1.0 <= coef <= 5.0:  # 合理系数范围
+                rules["coef_tier1"] = coef
+                break
+    
+    # 3. 提取 tier2 阈值和系数
+    tier2_threshold = {"weight_kg": {"min": None, "max": None}, "volume_m3": {"min": None, "max": None}}
+    
+    weight_range_t2 = [
+        r'(?:\d+(?:\.\d+)?)\s*[<＜]\s*(?:重量\s*)?[≤]\s*(\d+(?:\.\d+)?)\s*kg.*?(?:2\.0|2倍|二倍)',
+        r'(?:\d+(?:\.\d+)?)\s*[-–]\s*(\d+(?:\.\d+)?)\s*kg.*?(?:2\.0|2倍|二倍)',
+        r'超过\s*(\d+(?:\.\d+)?)\s*kg.*?(?:2\.0|2倍|二倍)',
+    ]
+    for pattern in weight_range_t2:
+        match = re.search(pattern, text, re.IGNORECASE)
+        if match:
+            tier2_threshold["weight_kg"]["min"] = float(match.group(1))
+            # 找 max
+            max_match = re.search(r'(?:重量\s*)?[≤]\s*(\d+(?:\.\d+)?)\s*kg', match.group(0) + text[match.end():match.end()+100])
+            if max_match:
+                tier2_threshold["weight_kg"]["max"] = float(max_match.group(1))
+            break
+    
+    # tier2 系数
+    if re.search(r'(?:2\.0|2倍|二倍)', text, re.IGNORECASE):
+        rules["coef_tier2"] = 2.0
+    
+    # tier2 体积阈值
+    volume_range_t2 = [
+        r'(?:\d+(?:\.\d+)?)\s*[<＜]\s*(?:体积\s*)?[≤]\s*(\d+(?:\.\d+)?)\s*m³.*?(?:2\.0|2倍|二倍)',
+        r'(\d+(?:\.\d+)?)\s*[-–]\s*(\d+(?:\.\d+)?)\s*m³.*?(?:2\.0|2倍|二倍)',
+    ]
+    for pattern in volume_range_t2:
+        match = re.search(pattern, text, re.IGNORECASE)
+        if match:
+            tier2_threshold["volume_m3"]["min"] = float(match.group(1))
+            if len(match.groups()) > 1 and match.group(2):
+                tier2_threshold["volume_m3"]["max"] = float(match.group(2))
+            break
+    
+    # 如果 tier2 没找到具体阈值，用 tier1 推算
+    if tier2_threshold["weight_kg"]["min"] is None:
+        tier2_threshold["weight_kg"]["min"] = tier1_threshold["weight_kg"]["max"]
+        tier2_threshold["weight_kg"]["max"] = tier2_threshold["weight_kg"]["min"] * 2
+    if tier2_threshold["volume_m3"]["min"] is None:
+        tier2_threshold["volume_m3"]["min"] = tier1_threshold["volume_m3"]["max"]
+        tier2_threshold["volume_m3"]["max"] = tier2_threshold["volume_m3"]["min"] * 1.25
+    
+    rules["threshold_tier2"] = tier2_threshold
+    
+    # 4. tier3 只有下限，没有上限（超过即用公式）
+    rules["threshold_tier3"] = {
+        "weight_kg": {"min": tier2_threshold["weight_kg"]["max"]},
+        "volume_m3": {"min": tier2_threshold["volume_m3"]["max"]}
+    }
+    
+    # 5. 提取 tier3 公式（如果有明确说明）
+    tier3_formula_patterns = [
+        r'超过.*?(?:\d+(?:\.\d+)?)\s*kg.*?按\s*(?:公式|计算)',
+        r'tier3|tier_3|Tier3.*?公式',
+    ]
+    has_tier3_formula = any(re.search(p, text, re.IGNORECASE) for p in tier3_formula_patterns)
+    # tier3 永远使用 max(重量/基准重量, 体积/基准体积) 公式
     
     return rules
 
@@ -504,7 +651,7 @@ def _extract_product_coefficients(text: str) -> dict:
     
     两类SKU：
     - 固定SKU：合同附件商品参数表中列出，系数固定为1.0，不适用超规格规则
-    - 非固定SKU：按超规格规则计算系数
+    - 非固定SKU：按超规格规则计算系数（超规格规则已移至 rules.oversized）
     
     Returns:
         {
@@ -512,13 +659,11 @@ def _extract_product_coefficients(text: str) -> dict:
             "coefficient_unit": "倍",
             "standard_unit_definition": { "max_weight_kg": 15, "max_volume_m3": 0.05 },
             "fixed_skus": {},
-            "fixed_sku_count": 0,
-            "oversized_rules": {
-                "tier1": { "threshold": "15kg<重量≤25kg 或 0.05m³<体积≤0.08m³", "coef": 1.2 },
-                "tier2": { "threshold": "25kg<重量≤30kg 或 0.08m³<体积≤0.1m³", "coef": 2.0 },
-                "tier3": { "threshold": "重量>30kg 或 体积>0.1m³", "coef": "max(重量/15, 体积/0.05)" }
-            }
+            "fixed_sku_count": 0
         }
+        
+    Note: 超规格规则（threshold_tier1/tier2/tier3, coef_tier1/tier2）
+          已移至 rules.oversized，由 _extract_oversized_rules 提取
     """
     result = {
         "description": "产品标准件系数",
@@ -528,12 +673,7 @@ def _extract_product_coefficients(text: str) -> dict:
             "max_volume_m3": 0.05
         },
         "fixed_skus": {},
-        "fixed_sku_count": 0,
-        "oversized_rules": {
-            "tier1": { "threshold": "15kg<重量≤25kg 或 0.05m³<体积≤0.08m³", "coef": 1.2 },
-            "tier2": { "threshold": "25kg<重量≤30kg 或 0.08m³<体积≤0.1m³", "coef": 2.0 },
-            "tier3": { "threshold": "重量>30kg 或 体积>0.1m³", "coef": "max(重量/15, 体积/0.05)" }
-        }
+        "fixed_sku_count": 0
     }
     
     # 查找商品参数表区域
@@ -559,12 +699,8 @@ def _extract_product_coefficients(text: str) -> dict:
     
     # 解析商品参数表
     sku_patterns = [
-        r'([A-Za-z0-9]+)\s*[,，]\s*([^,
-]+?)\s*[,，]\s*([^,
-]+?)\s*[,，]\s*(?:件|个|袋|箱)?\s*[,，]\s*([\d.]+)\s*[,，]\s*([\d.]+)',
-        r'([A-Za-z0-9]+)\s*[|]\s*([^|
-]+?)\s*[|]\s*([^|
-]+?)\s*[|]\s*(?:件|个|袋|箱)?\s*[|]\s*([\d.]+)\s*[|]\s*([\d.]+)',
+        r'([A-Za-z0-9]+)\s*[,，]\s*([^,，]+?)\s*[,，]\s*([^,，]+?)\s*[,，]\s*(?:件|个|袋|箱)?\s*[,，]\s*([\d.]+)\s*[,，]\s*([\d.]+)',
+        r'([A-Za-z0-9]+)\s*[|]\s*([^|]+?)\s*[|]\s*([^|]+?)\s*[|]\s*(?:件|个|袋|箱)?\s*[|]\s*([\d.]+)\s*[|]\s*([\d.]+)',
     ]
     
     for pattern in sku_patterns:
