@@ -1320,12 +1320,16 @@ class OrderToHuadingTemplate:
                 
                 # ========== 第2层：名称匹配（SKU编码未命中时）==========
                 if not sku_code and product_name:
-                    # 用商品名称在 system_sku 表中模糊匹配
+                    # 清理商品名称中的括号内容（避免中文/英文括号导致LIKE匹配失败）
+                    import re
+                    clean_product_name = re.sub(r'[（()].*?[）)]', '', product_name).strip()
+                    
+                    # 用清理后的名称在 system_sku 表中模糊匹配
                     cur.execute("""
                         SELECT sku_code, sku_name, package_spec 
                         FROM system_sku 
                         WHERE sku_name LIKE %s
-                    """, (f"%{product_name}%",))
+                    """, (f"%{clean_product_name}%",))
                     candidates = cur.fetchall()
                     
                     if not candidates:
@@ -1338,29 +1342,32 @@ class OrderToHuadingTemplate:
                         match_method = "名称匹配"
                     else:
                         # ========== 第3层：名称+规格匹配（多条时）==========
-                        matched = None
+                        # 提取规格关键词进行精确验证
+                        spec_keywords = re.findall(r'[\d.]+(?:kg|g|袋|瓶|罐)', spec.lower()) if spec else []
+                        
+                        matched_candidates = []
                         for c in candidates:
                             pkg_spec = c[2] or ""
-                            # 规格匹配：检查规格关键词是否匹配
-                            # 例如：订单规格 "2kg*6瓶/件" 包含 "2kg"
-                            spec_keywords = []
-                            if spec:
-                                # 提取规格中的关键单位（如 2kg、1kg、850g、50袋）
-                                import re
-                                spec_keywords = re.findall(r'[\d.]+(?:kg|g|袋|瓶|罐)', spec.lower())
-                            
                             if spec_keywords:
-                                # 检查规格关键词是否在 package_spec 中
-                                if any(kw in pkg_spec.lower() for kw in spec_keywords):
-                                    matched = c
-                                    break
+                                # 所有规格关键词都必须匹配才算成功
+                                if all(kw in pkg_spec.lower() for kw in spec_keywords):
+                                    matched_candidates.append(c)
+                            else:
+                                # 没有规格关键词时，全部加入候选
+                                matched_candidates.append(c)
                         
-                        if matched:
-                            sku_code = matched[0]
-                            sku_name = matched[1]
+                        if len(matched_candidates) == 1:
+                            # 唯一匹配
+                            sku_code = matched_candidates[0][0]
+                            sku_name = matched_candidates[0][1]
                             match_method = "名称+规格匹配"
+                        elif len(matched_candidates) > 1:
+                            # 多条匹配，取第一个
+                            sku_code = matched_candidates[0][0]
+                            sku_name = matched_candidates[0][1]
+                            match_method = f"名称+规格匹配(多条候选{len(matched_candidates)})",
                         else:
-                            # 兜底：返回第一个
+                            # 没有通过规格验证的，兜底返回第一个
                             sku_code = candidates[0][0]
                             sku_name = candidates[0][1]
                             match_method = f"名称匹配(兜底{len(candidates)}条)"
